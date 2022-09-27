@@ -8,20 +8,14 @@ This is a 3D Slicer extension for semi-automatic placement of stereo electroence
 2. Download the zip extension from https://github.com/justomont/SlicerAutoelectrodes.
 3. Unzip the folder.
 4. Start 3D Slicer.
-5. Go to Modules (upper bar) and click on the magnifier icon:
-    
-    ![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/757548ef-7759-4bb1-a1f7-5da423d0eebc/Untitled.png)
-    
+5. Go to Modules (upper bar) and click on the magnifier icon.
 6. Select the Extension Wizard > Extension Tools > Select Extension.
 7. Select and Open the unzipped folder **SlicerAutoelectrodes**.
-8. The following window will appear:
-
-![Untitled](https://s3-us-west-2.amazonaws.com/secure.notion-static.com/e32ff595-90b7-4a2b-b0da-f38952e4c88a/Untitled.png)
-
-1. Make sure that both boxes are selected and then click on **Yes**.
-2. Installation complete!
-3. To open the extension, go to the Modules Menu > SEEG > Autoelectrodes.
-4. Enjoy! 
+8. A window will appear
+9. Make sure that both boxes are selected and then click on **Yes**.
+10. Installation complete!
+11. To open the extension, go to the Modules Menu > SEEG > Autoelectrodes.
+12. Enjoy! 
 
 ## Tutorial
 
