@@ -233,7 +233,6 @@ def findContacts():
                         #Create rulers where the whole electrodes are
                         rulerNode = slicer.vtkMRMLAnnotationRulerNode()
                         rulerNode.SetName("test"+letter)
-                        # slicer.mrmlScene.AddNode(rulerNode)
                         rulerNode.Initialize(slicer.mrmlScene)
                         rulerNode.SetPosition1(RAS[index])
                         rulerNode.SetPosition2(RAS[index+1])
@@ -244,6 +243,7 @@ def findContacts():
                         rulerNode.SetDistanceAnnotationScale(0)
                         rulerNode.GetDisplayNode().SetLineThickness(6)
                         rulerNode.GetDisplayNode().SetMaxTicks(0)
+                        rulerNode.SetLocked(True)
             
             # Lock all markups
             for markupN in range(fidNode.GetNumberOfMarkups()):
@@ -252,6 +252,13 @@ def findContacts():
                 fidNodeWM.SetNthFiducialLocked(markupN,True)
             for markupN in range(fidNodeP.GetNumberOfMarkups()):
                 fidNodeP.SetNthFiducialLocked(markupN,True)
+            
+            # Atlases
+            for index,contact in enumerate(monopolar_markups):
+                ras = monopolar_RAS[index]
+                point_ijk = RAStoIJK(ras,volumeNode)
+                aseg_label = anatomicREL(voxelArray[point_ijk[2],point_ijk[1],point_ijk[0]])
+                print(contact+" "+aseg_label+"\n")
             
             # Bipolar 
             fidNodeBi = slicer.vtkMRMLMarkupsFiducialNode()
@@ -308,7 +315,7 @@ def findContacts():
                 fidNodeBi_P.SetNthFiducialLocked(markupN,True)
             
         except: 
-            logging.info("No info loaded for the "+Hloc+" hemisphere.")
+            logging.info("No info loaded for the "+Hloc+" hemisphere.\n")
 
 
 
