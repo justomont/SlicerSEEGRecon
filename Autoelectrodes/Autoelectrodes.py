@@ -7,11 +7,20 @@ import slicer
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
 
-
 import re
 import numpy as np
 import csv
 from itertools import compress
+
+import os
+from os import listdir
+from os.path import isfile, join
+try:
+    import pandas as pd
+except: 
+    import pip
+    pip.main(["install","pandas"])
+    import pandas as pd
 
 def has_numbers(inputString):
     return any(char.isdigit() for char in inputString)
@@ -129,255 +138,365 @@ def NthFiducialPosition(fidNode,n):
     pos = [0,0,0]
     fidNode.GetNthFiducialPosition(n,pos)
     return pos
+    
 
 def findContacts():
     
     hemisphere_location = ["L","R"]
+    Hpresent = []
+    
     for Hloc in hemisphere_location:
-        try:
-            # Get the markup fiducials
-            fidNode = slicer.mrmlScene.GetFirstNodeByName("real-"+Hloc)
+        fidNode = slicer.mrmlScene.GetFirstNodeByName("real-"+Hloc)
+        if fidNode != None:
+            Hpresent.append(Hloc)
+
+    for Hloc in Hpresent:
+        # Get the markup fiducials
+        fidNode = slicer.mrmlScene.GetFirstNodeByName("real-"+Hloc)
+        
+        # Get the aseg map
+        volumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
+        voxelArray = slicer.util.arrayFromVolume(volumeNode)
+        
+        # All markup's names and positions in RAS coordinates
+        markup_names = [fidNode.GetNthFiducialLabel(i) for i in range(fidNode.GetNumberOfFiducials())]
+        markup_RAS = [NthFiducialPosition(fidNode,i) for i in range(fidNode.GetNumberOfFiducials())]
+        
+        # Remove markups that signal the END of the electrode (wich is not the last contact but the tip of the elctrode, outside of the skull)
+        boolean = [has_numbers(name) for name in markup_names]
+        clean_markup_names = list(compress(markup_names, boolean))
+        clean_markup_RAS = list(compress(markup_RAS, boolean))
+        
+        # Sort the lists alphabetically
+        tuples = zip(*sorted(zip(clean_markup_names, clean_markup_RAS)))
+        markups, RAS = [list(tuple) for tuple in  tuples]
+        
+        # Store also the location of the end of the electrodes just for representational purposes
+        end_boolean = [not element for element in boolean]
+        end_markup_names = list(compress(markup_names, end_boolean))
+        end_markup_RAS = list(compress(markup_RAS, end_boolean))
+        end_tuples = zip(*sorted(zip(end_markup_names, end_markup_RAS)))
+        end_markups, end_RAS = [list(tuple) for tuple in  end_tuples]
+        
+        #############################################################################
+        # Monopolar. The tool just adds the contacts where they really are in space.#
+        #############################################################################
+        # Goal: Compute the position of the remaining contacts and include them in the monopolar markup list (real-R/L)
+        
+        # Initialize lists for the markups and their RAS coordinates
+        monopolar_markups = []
+        monopolar_RAS = []
+        
+        monopolar_markups_WM = []
+        monopolar_RAS_WM = []
+        fidNodeWM = slicer.vtkMRMLMarkupsFiducialNode()
+        fidNodeWM.SetName("real-"+Hloc+"-WM")
+        slicer.mrmlScene.AddNode(fidNodeWM)
+        
+        monopolar_markups_P = []
+        monopolar_RAS_P = []
+        fidNodeP = slicer.vtkMRMLMarkupsFiducialNode()
+        fidNodeP.SetName("real-"+Hloc+"-P")
+        slicer.mrmlScene.AddNode(fidNodeP)
+        
+        monopolar_markups_E = []
+        monopolar_RAS_E = []
+        fidNodeE = slicer.vtkMRMLMarkupsFiducialNode()
+        fidNodeE.SetName("real-"+Hloc+"-ends")
+        slicer.mrmlScene.AddNode(fidNodeE)
+        
+        # Iterate over all the markups defined by the user
+        for index,markup in enumerate(markups): 
+            if index < len(markups)-1: # There's a -1 one here because the penultimate markup adds the last markup, so there is no need to check the last one
             
-            # Get the aseg map
-            volumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
-            voxelArray = slicer.util.arrayFromVolume(volumeNode)
-            
-            # All markup's names and positions in RAS coordinates
-            markup_names = [fidNode.GetNthFiducialLabel(i) for i in range(fidNode.GetNumberOfFiducials())]
-            markup_RAS = [NthFiducialPosition(fidNode,i) for i in range(fidNode.GetNumberOfFiducials())]
-            
-            # Remove markups that signal the END of the electrode (wich is not the last contact but the tip of the elctrode, outside of the skull)
-            boolean = [has_numbers(name) for name in markup_names]
-            clean_markup_names = list(compress(markup_names, boolean))
-            clean_markup_RAS = list(compress(markup_RAS, boolean))
-            
-            # Sort the lists alphabetically
-            tuples = zip(*sorted(zip(clean_markup_names, clean_markup_RAS)))
-            markups, RAS = [list(tuple) for tuple in  tuples]
-            
-            # Store also the location of the end of the electrodes just for representational purposes
-            end_boolean = [not element for element in boolean]
-            end_markup_names = list(compress(markup_names, end_boolean))
-            end_markup_RAS = list(compress(markup_RAS, end_boolean))
-            end_tuples = zip(*sorted(zip(end_markup_names, end_markup_RAS)))
-            end_markups, end_RAS = [list(tuple) for tuple in  end_tuples]
-            
-            #############################################################################
-            # Monopolar. The tool just adds the contacts where they really are in space.#
-            #############################################################################
-            # Goal: Compute the position of the remaining contacts and include them in the monopolar markup list (real-R/L)
-            
-            # Initialize lists for the markups and their RAS coordinates
-            monopolar_markups = []
-            monopolar_RAS = []
-            
-            monopolar_markups_WM = []
-            monopolar_RAS_WM = []
-            fidNodeWM = slicer.vtkMRMLMarkupsFiducialNode()
-            fidNodeWM.SetName("real-"+Hloc+"-WM")
-            slicer.mrmlScene.AddNode(fidNodeWM)
-            
-            monopolar_markups_P = []
-            monopolar_RAS_P = []
-            fidNodeP = slicer.vtkMRMLMarkupsFiducialNode()
-            fidNodeP.SetName("real-"+Hloc+"-P")
-            slicer.mrmlScene.AddNode(fidNodeP)
-            
-            monopolar_markups_E = []
-            monopolar_RAS_E = []
-            fidNodeE = slicer.vtkMRMLMarkupsFiducialNode()
-            fidNodeE.SetName("real-"+Hloc+"-ends")
-            slicer.mrmlScene.AddNode(fidNodeE)
-            
-            # Iterate over all the markups defined by the user
-            for index,markup in enumerate(markups): 
-                if index < len(markups)-1: # There's a -1 one here because the penultimate markup adds the last markup, so there is no need to check the last one
+                # Check the letter/name and the number of the selected markup and the next one in the list
+                letter = ''.join([i for i in markup if not i.isdigit()])
+                digit = int(re.search(r'\d+', markup).group())
+                next_letter = ''.join([i for i in markups[index+1] if not i.isdigit()])
+                next_digit = int(re.search(r'\d+', markups[index+1]).group())
                 
-                    # Check the letter/name and the number of the selected markup and the next one in the list
-                    letter = ''.join([i for i in markup if not i.isdigit()])
-                    digit = int(re.search(r'\d+', markup).group())
-                    next_letter = ''.join([i for i in markups[index+1] if not i.isdigit()])
-                    next_digit = int(re.search(r'\d+', markups[index+1]).group())
-                    
-                    # If they have the same letter we can continue because it means that are part of the same electrode
-                    if letter == next_letter:
-                        # add initial contact to the new list
-                        if markup not in monopolar_markups:
-                            monopolar_markups.append(markup)
-                            monopolar_RAS.append(RAS[index])
-                            # check location of the contact (WM or not)
-                            ijk_position = RAStoIJK(RAS[index], volumeNode)
-                            anatomic_position = anatomicREL(voxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
-                            if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
-                                monopolar_markups_WM.append(markup)
-                                monopolar_RAS_WM.append(RAS[index])
-                                fidNodeWM.AddFiducialFromArray(RAS[index], markup)
-                            else:
-                                monopolar_markups_P.append(markup)
-                                monopolar_RAS_P.append(RAS[index])
-                                fidNodeP.AddFiducialFromArray(RAS[index], markup)
-                        # calculate how many markups should be added until the next user-defined markup
-                        additions = next_digit - digit-1
-                        # calculate how distant the markups should be
-                        distance = np.subtract(RAS[index+1], RAS[index])/(additions+1)
-                        # add these new markups
-                        for i in range(additions):
-                            new_digit = digit+i+1
-                            new_position = np.add(RAS[index], distance*(digit+i))
-                            monopolar_markups.append(letter+str(new_digit))
-                            monopolar_RAS.append(new_position)
-                            
-                            fidNode.AddFiducialFromArray(new_position, letter+str(new_digit))
-                            
-                            ijk_position = RAStoIJK(new_position, volumeNode)
-                            anatomic_position = anatomicREL(voxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
-                            if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
-                                monopolar_markups_WM.append(letter+str(new_digit))
-                                monopolar_RAS_WM.append(new_position)
-                                fidNodeWM.AddFiducialFromArray(new_position, letter+str(new_digit))
-                            else:
-                                monopolar_markups_P.append(letter+str(new_digit))
-                                monopolar_RAS_P.append(new_position)
-                                fidNodeP.AddFiducialFromArray(new_position, letter+str(new_digit))
-                            
-                        monopolar_markups.append(markups[index+1])
-                        monopolar_RAS.append(RAS[index+1])
+                # If they have the same letter we can continue because it means that are part of the same electrode
+                if letter == next_letter:
+                    # add initial contact to the new list
+                    if markup not in monopolar_markups:
+                        monopolar_markups.append(markup)
+                        monopolar_RAS.append(RAS[index])
+                        # check location of the contact (WM or not)
+                        ijk_position = RAStoIJK(RAS[index], volumeNode)
+                        anatomic_position = anatomicREL(voxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
+                        if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
+                            monopolar_markups_WM.append(markup)
+                            monopolar_RAS_WM.append(RAS[index])
+                            fidNodeWM.AddFiducialFromArray(RAS[index], markup)
+                        else:
+                            monopolar_markups_P.append(markup)
+                            monopolar_RAS_P.append(RAS[index])
+                            fidNodeP.AddFiducialFromArray(RAS[index], markup)
+                    # calculate how many markups should be added until the next user-defined markup
+                    additions = next_digit - digit-1
+                    # calculate how distant the markups should be
+                    distance = np.subtract(RAS[index+1], RAS[index])/(additions+1)
+                    # add these new markups
+                    for i in range(additions):
+                        new_digit = digit+i+1
+                        new_position = np.add(RAS[index], distance*(digit+i))
+                        monopolar_markups.append(letter+str(new_digit))
+                        monopolar_RAS.append(new_position)
+                        
+                        fidNode.AddFiducialFromArray(new_position, letter+str(new_digit))
+                        
                         ijk_position = RAStoIJK(new_position, volumeNode)
                         anatomic_position = anatomicREL(voxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
                         if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
-                            monopolar_markups_WM.append(markups[index+1])
-                            monopolar_RAS_WM.append(RAS[index+1])
-                            fidNodeWM.AddFiducialFromArray(RAS[index+1], markups[index+1])
+                            monopolar_markups_WM.append(letter+str(new_digit))
+                            monopolar_RAS_WM.append(new_position)
+                            fidNodeWM.AddFiducialFromArray(new_position, letter+str(new_digit))
                         else:
-                            monopolar_markups_P.append(markups[index+1])
-                            monopolar_RAS_P.append(RAS[index+1])
-                            fidNodeP.AddFiducialFromArray(RAS[index+1], markups[index+1])
+                            monopolar_markups_P.append(letter+str(new_digit))
+                            monopolar_RAS_P.append(new_position)
+                            fidNodeP.AddFiducialFromArray(new_position, letter+str(new_digit))
                         
-                        #Create rulers where the whole electrodes are
-                        rulerNode = slicer.vtkMRMLAnnotationRulerNode()
-                        rulerNode.SetName(letter)
-                        rulerNode.Initialize(slicer.mrmlScene)
-                        rulerNode.SetPosition1(RAS[index])
-                        rulerNode.SetPosition2(RAS[index+1])
-                        if Hloc == "R":
-                            rulerNode.GetDisplayNode().SetColor([0,0,1.])
-                        else:
-                            rulerNode.GetDisplayNode().SetColor([170/255,0,0])
-                        rulerNode.SetDistanceAnnotationScale(0)
-                        rulerNode.GetDisplayNode().SetLineThickness(6)
-                        rulerNode.GetDisplayNode().SetMaxTicks(0)
-                        rulerNode.SetLocked(True)
-                    
-                    # if the letter is not the same as the next one it means we found the last markup of the electrode, 
-                    # thus we can extend this last section to better grpahically represent the electrode
+                    monopolar_markups.append(markups[index+1])
+                    monopolar_RAS.append(RAS[index+1])
+                    ijk_position = RAStoIJK(new_position, volumeNode)
+                    anatomic_position = anatomicREL(voxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
+                    if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
+                        monopolar_markups_WM.append(markups[index+1])
+                        monopolar_RAS_WM.append(RAS[index+1])
+                        fidNodeWM.AddFiducialFromArray(RAS[index+1], markups[index+1])
                     else:
-                        # compute the vector that defines the line that passes through the last point and the penultimate user-defined markup
-                        pointA = RAS[index-1]
-                        pointB = RAS[index]
-                        l = pointB[0]-pointA[0]
-                        m = pointB[1]-pointA[1]
-                        n = pointB[2]-pointA[2]
-                        AB = np.array([l,m,n])
-                        # select the last point
-                        pointE = end_RAS[end_markups.index(letter)]
-                        l = pointE[0]-pointA[0]
-                        m = pointE[1]-pointA[1]
-                        n = pointE[2]-pointA[2]
-                        AE = np.array([l,m,n])
-                        # project the last markup (E) onto the line generated by AB
-                        P = pointA + np.dot(AE,AB) / np.dot(AB,AB) * AB
-                        # generate projection on Slicer 
-                        fidNodeE.AddFiducialFromArray(P,letter)
-                        # add ruler
-                        rulerNode = slicer.vtkMRMLAnnotationRulerNode()
-                        rulerNode.SetName(letter)
-                        rulerNode.Initialize(slicer.mrmlScene)
-                        rulerNode.SetPosition1(RAS[index])
-                        rulerNode.SetPosition2(P)
-                        if Hloc == "R":
-                            rulerNode.GetDisplayNode().SetColor([0,0,1.])
-                        else:
-                            rulerNode.GetDisplayNode().SetColor([170/255,0,0])
-                        rulerNode.SetDistanceAnnotationScale(0)
-                        rulerNode.GetDisplayNode().SetLineThickness(6)
-                        rulerNode.GetDisplayNode().SetMaxTicks(0)
-                        rulerNode.SetLocked(True)
-                        
-            # Lock all markups
-            for markupN in range(fidNode.GetNumberOfMarkups()):
-                fidNode.SetNthFiducialLocked(markupN,True)
-            for markupN in range(fidNodeWM.GetNumberOfMarkups()):
-                fidNodeWM.SetNthFiducialLocked(markupN,True)
-            for markupN in range(fidNodeP.GetNumberOfMarkups()):
-                fidNodeP.SetNthFiducialLocked(markupN,True)
-            for markupN in range(fidNodeE.GetNumberOfMarkups()):
-                fidNodeE.SetNthFiducialLocked(markupN,True)
-            
-            # Atlases
-            for index,contact in enumerate(monopolar_markups):
-                ras = monopolar_RAS[index]
-                point_ijk = RAStoIJK(ras,volumeNode)
-                aseg_label = anatomicREL(voxelArray[point_ijk[2],point_ijk[1],point_ijk[0]])
-                print(contact+" "+aseg_label+"\n")
-            
-            # Bipolar 
-            fidNodeBi = slicer.vtkMRMLMarkupsFiducialNode()
-            fidNodeBi.SetName("Bi-real-"+Hloc)
-            slicer.mrmlScene.AddNode(fidNodeBi)
-            bipolar_markups = []
-            bipolar_RAS = []
-            
-            fidNodeBi_WM = slicer.vtkMRMLMarkupsFiducialNode()
-            fidNodeBi_WM.SetName("Bi-real-"+Hloc+"_WM")
-            slicer.mrmlScene.AddNode(fidNodeBi_WM)
-            bipolar_markups_WM = []
-            bipolar_RAS_WM = []
-            
-            fidNodeBi_P = slicer.vtkMRMLMarkupsFiducialNode()
-            fidNodeBi_P.SetName("Bi-real-"+Hloc+"_P")
-            slicer.mrmlScene.AddNode(fidNodeBi_P)
-            bipolar_markups_P = []
-            bipolar_RAS_P = []
-            
-            
-            for index,markup in enumerate(monopolar_markups):
-                if index < len(monopolar_markups)-1:
-                    letter = ''.join([i for i in markup if not i.isdigit()])
-                    digit = int(re.search(r'\d+', markup).group())
-                    next_letter = ''.join([i for i in monopolar_markups[index+1] if not i.isdigit()])
-                    next_digit = int(re.search(r'\d+', monopolar_markups[index+1]).group())
+                        monopolar_markups_P.append(markups[index+1])
+                        monopolar_RAS_P.append(RAS[index+1])
+                        fidNodeP.AddFiducialFromArray(RAS[index+1], markups[index+1])
                     
-                    if letter == next_letter:
-                        middle_point = np.add(monopolar_RAS[index+1], monopolar_RAS[index])/2
-                        bi_tag = "-".join([markup,monopolar_markups[index+1]])
-                        bipolar_markups.append(bi_tag)
-                        bipolar_RAS.append(middle_point)
-                        
-                        fidNodeBi.AddFiducialFromArray(middle_point, bi_tag)
-                        
-                        ijk_position = RAStoIJK(middle_point, volumeNode)
-                        anatomic_position = anatomicREL(voxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
-                        if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
-                            bipolar_markups_WM.append(bi_tag)
-                            bipolar_RAS_WM.append(middle_point)
-                            fidNodeBi_WM.AddFiducialFromArray(middle_point, bi_tag)
-                        else:
-                            bipolar_markups_P.append(bi_tag)
-                            bipolar_RAS_P.append(middle_point)
-                            fidNodeBi_P.AddFiducialFromArray(middle_point, bi_tag)
-                        
-            # Lock all markups
-            for markupN in range(fidNodeBi.GetNumberOfMarkups()):
-                fidNodeBi.SetNthFiducialLocked(markupN,True)
-            for markupN in range(fidNodeBi_WM.GetNumberOfMarkups()):
-                fidNodeBi_WM.SetNthFiducialLocked(markupN,True)
-            for markupN in range(fidNodeBi_P.GetNumberOfMarkups()):
-                fidNodeBi_P.SetNthFiducialLocked(markupN,True)
+                    #Create rulers where the whole electrodes are
+                    rulerNode = slicer.vtkMRMLAnnotationRulerNode()
+                    rulerNode.SetName(letter)
+                    rulerNode.Initialize(slicer.mrmlScene)
+                    rulerNode.SetPosition1(RAS[index])
+                    rulerNode.SetPosition2(RAS[index+1])
+                    if Hloc == "R":
+                        rulerNode.GetDisplayNode().SetColor([0,0,1.])
+                    else:
+                        rulerNode.GetDisplayNode().SetColor([170/255,0,0])
+                    rulerNode.SetDistanceAnnotationScale(0)
+                    rulerNode.GetDisplayNode().SetLineThickness(6)
+                    rulerNode.GetDisplayNode().SetMaxTicks(0)
+                    rulerNode.SetLocked(True)
+                
+                # if the letter is not the same as the next one it means we found the last markup of the electrode, 
+                # thus we can extend this last section to better grpahically represent the electrode
+                else:
+                    # compute the vector that defines the line that passes through the last point and the penultimate user-defined markup
+                    pointA = RAS[index-1]
+                    pointB = RAS[index]
+                    l = pointB[0]-pointA[0]
+                    m = pointB[1]-pointA[1]
+                    n = pointB[2]-pointA[2]
+                    AB = np.array([l,m,n])
+                    # select the last point
+                    pointE = end_RAS[end_markups.index(letter)]
+                    l = pointE[0]-pointA[0]
+                    m = pointE[1]-pointA[1]
+                    n = pointE[2]-pointA[2]
+                    AE = np.array([l,m,n])
+                    # project the last markup (E) onto the line generated by AB
+                    P = pointA + np.dot(AE,AB) / np.dot(AB,AB) * AB
+                    # generate projection on Slicer 
+                    fidNodeE.AddFiducialFromArray(P,letter)
+                    # add ruler
+                    rulerNode = slicer.vtkMRMLAnnotationRulerNode()
+                    rulerNode.SetName(letter)
+                    rulerNode.Initialize(slicer.mrmlScene)
+                    rulerNode.SetPosition1(RAS[index])
+                    rulerNode.SetPosition2(P)
+                    if Hloc == "R":
+                        rulerNode.GetDisplayNode().SetColor([0,0,1.])
+                    else:
+                        rulerNode.GetDisplayNode().SetColor([170/255,0,0])
+                    rulerNode.SetDistanceAnnotationScale(0)
+                    rulerNode.GetDisplayNode().SetLineThickness(6)
+                    rulerNode.GetDisplayNode().SetMaxTicks(0)
+                    rulerNode.SetLocked(True)
+                    
+        # Lock all markups
+        for markupN in range(fidNode.GetNumberOfMarkups()):
+            fidNode.SetNthFiducialLocked(markupN,True)
+        for markupN in range(fidNodeWM.GetNumberOfMarkups()):
+            fidNodeWM.SetNthFiducialLocked(markupN,True)
+        for markupN in range(fidNodeP.GetNumberOfMarkups()):
+            fidNodeP.SetNthFiducialLocked(markupN,True)
+        for markupN in range(fidNodeE.GetNumberOfMarkups()):
+            fidNodeE.SetNthFiducialLocked(markupN,True)
+        
+        logging.info("Monopolar contact placement complete.\n") 
+        
+        # Atlases
+        # ASEG atlas
+        for index,contact in enumerate(monopolar_markups):
+            ras = monopolar_RAS[index]
+            point_ijk = RAStoIJK(ras,volumeNode)
+            aseg_label = anatomicREL(voxelArray[point_ijk[2],point_ijk[1],point_ijk[0]])
+            # print(contact+" "+aseg_label+"\n")
+       
+        # # ICBM152  
+        # # Set parameters
+        # mniPath = os.path.join(os.path.dirname(__file__), 'Resources/MNI')
+        # templatePath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a.nii')
+        # labelmapPath = os.path.join(mniPath, 'mni_icbm152_CerebrA_tal_nlin_sym_09c.nii')
+        # movingmaskPath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a_mask.nii')
+        
+        # fixedVolumeNode = slicer.mrmlScene.GetFirstNodeByName("brain")
+        # movingVolumeNode = slicer.util.loadVolume(templatePath,properties={"name":"ICBM152_T1","center":True})
+        # labelmapVolumeNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_labels","labelmap":True,"center":True})
+        
+        # linearTransformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
+        # linearTransformNode.SetName("Transform2MNI")
+        # outputVolumeNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
+        # outputVolumeNode.SetName("ICBM152_registered")
+        
+        # fixedmaskNode = slicer.mrmlScene.GetFirstNodeByName("aseg")
+        # movingmaskNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_mask","labelmap":True,"center":True})
+        
+        # parameters = {}
+        # parameters["fixedVolume"] = fixedVolumeNode
+        # parameters["movingVolume"] = movingVolumeNode
+        # # parameters["samplingPercentage"] = 0.002  # Default sampling percentage of 0.002, to change it, uncomment the next line and change the value
+        # # parameters["splineGridSize"] = [14,10,12] # Default B-spline grid size 14,10,12, to change it, uncomment the next line and change the value
+        # parameters["linearTransform"] = linearTransformNode
+        # parameters["outputVolume"] = outputVolumeNode
+        # parameters["initializeTransformMode"] = "useCenterOfHeadAlign"
+        # parameters["useRigid"] = True
+        # parameters["useScaleVersor3D"] = True
+        # parameters["useScaleSkewVersor3D"] = True
+        # parameters["useAffine"] = True
+        # parameters["maskProcessingMode"] = "ROI"
+        # parameters["fixedBinaryVolume"] = fixedmaskNode
+        # parameters["movingBinaryVolume"] = movingmaskNode
+        # parameters["outputFixedVolumeROI"] = fixedmaskNode
+        # parameters["outputMovingVolumeROI"] = fixedmaskNode
+        # # Execution
+        # generalRegistration = slicer.modules.brainsfit
+        # cliNode = slicer.cli.run(generalRegistration, None, parameters)
+        
+        # logging.info("enter.\n")
+        # transform = slicer.util.getFirstNodeByName("Transform2MNI")
+        # labels = slicer.util.getFirstNodeByName("MNI_labels")
+        # labels.ApplyTransformMatrix(transform.GetMatrixTransformToParent())
+        # transform = slicer.util.getFirstNodeByName("Transform2MNI")
+        # labels = slicer.util.getFirstNodeByName("MNI_labels")
+        # labels.ApplyTransformMatrix(transform.GetMatrixTransformToParent())
+        # logging.info("out.\n")
+       
+        # Bipolar 
+        fidNodeBi = slicer.vtkMRMLMarkupsFiducialNode()
+        fidNodeBi.SetName("Bi-real-"+Hloc)
+        slicer.mrmlScene.AddNode(fidNodeBi)
+        bipolar_markups = []
+        bipolar_RAS = []
+        
+        fidNodeBi_WM = slicer.vtkMRMLMarkupsFiducialNode()
+        fidNodeBi_WM.SetName("Bi-real-"+Hloc+"_WM")
+        slicer.mrmlScene.AddNode(fidNodeBi_WM)
+        bipolar_markups_WM = []
+        bipolar_RAS_WM = []
+        
+        fidNodeBi_P = slicer.vtkMRMLMarkupsFiducialNode()
+        fidNodeBi_P.SetName("Bi-real-"+Hloc+"_P")
+        slicer.mrmlScene.AddNode(fidNodeBi_P)
+        bipolar_markups_P = []
+        bipolar_RAS_P = []
+        
+        
+        for index,markup in enumerate(monopolar_markups):
+            if index < len(monopolar_markups)-1:
+                letter = ''.join([i for i in markup if not i.isdigit()])
+                digit = int(re.search(r'\d+', markup).group())
+                next_letter = ''.join([i for i in monopolar_markups[index+1] if not i.isdigit()])
+                next_digit = int(re.search(r'\d+', monopolar_markups[index+1]).group())
+                
+                if letter == next_letter:
+                    middle_point = np.add(monopolar_RAS[index+1], monopolar_RAS[index])/2
+                    bi_tag = "-".join([markup,monopolar_markups[index+1]])
+                    bipolar_markups.append(bi_tag)
+                    bipolar_RAS.append(middle_point)
+                    
+                    fidNodeBi.AddFiducialFromArray(middle_point, bi_tag)
+                    
+                    ijk_position = RAStoIJK(middle_point, volumeNode)
+                    anatomic_position = anatomicREL(voxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
+                    if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
+                        bipolar_markups_WM.append(bi_tag)
+                        bipolar_RAS_WM.append(middle_point)
+                        fidNodeBi_WM.AddFiducialFromArray(middle_point, bi_tag)
+                    else:
+                        bipolar_markups_P.append(bi_tag)
+                        bipolar_RAS_P.append(middle_point)
+                        fidNodeBi_P.AddFiducialFromArray(middle_point, bi_tag)
+                    
+        # Lock all markups
+        for markupN in range(fidNodeBi.GetNumberOfMarkups()):
+            fidNodeBi.SetNthFiducialLocked(markupN,True)
+        for markupN in range(fidNodeBi_WM.GetNumberOfMarkups()):
+            fidNodeBi_WM.SetNthFiducialLocked(markupN,True)
+        for markupN in range(fidNodeBi_P.GetNumberOfMarkups()):
+            fidNodeBi_P.SetNthFiducialLocked(markupN,True)
+        
+        logging.info("Bipolar contact placement complete.\n") 
+        
+def regionsMNI():
+    
+    # ICBM152  
+    # Paths
+    mniPath = os.path.join(os.path.dirname(__file__), 'Resources/MNI')
+    templatePath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a.nii') # moving volume
+    movingmaskPath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a_mask.nii') # moving volume mask
+    labelmapPath = os.path.join(mniPath, 'mni_icbm152_CerebrA_tal_nlin_sym_09c.nii') # labelmap
+    
+    # Set parameters
+    fixedVolumeNode = slicer.mrmlScene.GetFirstNodeByName("brain")
+    movingVolumeNode = slicer.util.loadVolume(templatePath,properties={"name":"ICBM152_T1","center":True})
+    
+    linearTransformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
+    linearTransformNode.SetName("Transform2MNI")
+    outputVolumeNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
+    outputVolumeNode.SetName("ICBM152_registered")
+    
+    fixedmaskNode = slicer.mrmlScene.CopyNode(slicer.util.getFirstNodeByName("aseg"))
+    fixedmaskNode.SetName("aseg_mask")
+    slicer.mrmlScene.AddNode(fixedmaskNode)
+    movingmaskNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_mask","labelmap":True,"center":True})
+    
+    parameters = {}
+    parameters["fixedVolume"] = fixedVolumeNode
+    parameters["movingVolume"] = movingVolumeNode
+    parameters["samplingPercentage"] = 0.005  
+    parameters["linearTransform"] = linearTransformNode
+    parameters["outputVolume"] = outputVolumeNode
+    parameters["initializeTransformMode"] = "useCenterOfHeadAlign"
+    parameters["useRigid"] = True
+    parameters["useScaleVersor3D"] = True
+    parameters["useScaleSkewVersor3D"] = True
+    parameters["useAffine"] = True
+    parameters["maskProcessingMode"] = "ROI"
+    parameters["fixedBinaryVolume"] = fixedmaskNode
+    parameters["movingBinaryVolume"] = movingmaskNode
+    parameters["outputFixedVolumeROI"] = fixedmaskNode
+    parameters["outputMovingVolumeROI"] = fixedmaskNode
+    
+    # Execution
+    generalRegistration = slicer.modules.brainsfit
+    cliNode = slicer.cli.run(generalRegistration, None, parameters)
+    
+    labelmapVolumeNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_labels","labelmap":True,"center":True})
+    transform = slicer.util.getFirstNodeByName("Transform2MNI")
+    transformedLabels = slicer.mrmlScene.CopyNode(labelmapVolumeNode)
+    transformedLabels.SetName("transformed_MNI_labels")
+    transformedLabels.ApplyTransformMatrix(transform.GetMatrixTransformToParent())
+    
+    logging.info("MNI registration complete.\n")   
             
-        except: 
-            logging.info("No info loaded for the "+Hloc+" hemisphere.\n")
-
-
+        
 
 #
 # Autoelectrodes
@@ -713,7 +832,8 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         # stopTime = time.time()
         # logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
 
-        # logging.info("Hello world")
+        logging.info("Starting...")
+        regionsMNI()
         findContacts()
 
 
