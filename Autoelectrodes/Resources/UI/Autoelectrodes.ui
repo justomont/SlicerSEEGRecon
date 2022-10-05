@@ -12,6 +12,13 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
+    <widget class="QPushButton" name="pushButton">
+     <property name="text">
+      <string>Atlas</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QPushButton" name="applyButton">
      <property name="enabled">
       <bool>false</bool>
@@ -20,7 +27,7 @@
       <string>Run the algorithm.</string>
      </property>
      <property name="text">
-      <string>Apply</string>
+      <string>Autoelectrodes</string>
      </property>
     </widget>
    </item>

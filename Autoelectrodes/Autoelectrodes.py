@@ -14,7 +14,8 @@ from itertools import compress
 
 import os
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile,join
+
 try:
     import pandas as pd
 except: 
@@ -444,14 +445,14 @@ def findContacts():
         
         logging.info("Bipolar contact placement complete.\n") 
         
-def regionsMNI():
+def registerMNI():
+    global mniPath, linearTransformNode
     
     # ICBM152  
     # Paths
     mniPath = os.path.join(os.path.dirname(__file__), 'Resources/MNI')
     templatePath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a.nii') # moving volume
     movingmaskPath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a_mask.nii') # moving volume mask
-    labelmapPath = os.path.join(mniPath, 'mni_icbm152_CerebrA_tal_nlin_sym_09c.nii') # labelmap
     
     # Set parameters
     fixedVolumeNode = slicer.mrmlScene.GetFirstNodeByName("brain")
@@ -462,10 +463,11 @@ def regionsMNI():
     outputVolumeNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
     outputVolumeNode.SetName("ICBM152_registered")
     
-    fixedmaskNode = slicer.mrmlScene.CopyNode(slicer.util.getFirstNodeByName("aseg"))
+    aseg = slicer.util.getFirstNodeByName("aseg")
+    fixedmaskNode = slicer.mrmlScene.CopyNode(aseg)
     fixedmaskNode.SetName("aseg_mask")
-    slicer.mrmlScene.AddNode(fixedmaskNode)
-    movingmaskNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_mask","labelmap":True,"center":True})
+    movingmaskNode = slicer.util.loadVolume(movingmaskPath,properties={"name":"MNI_mask","labelmap":True,"center":True})
+    # movingmaskNode = slicer.util.loadVolume(labelmaskPath,properties={"name":"MNI_mask","labelmap":True,"center":True})
     
     parameters = {}
     parameters["fixedVolume"] = fixedVolumeNode
@@ -474,9 +476,9 @@ def regionsMNI():
     parameters["linearTransform"] = linearTransformNode
     parameters["outputVolume"] = outputVolumeNode
     parameters["initializeTransformMode"] = "useCenterOfHeadAlign"
-    parameters["useRigid"] = True
-    parameters["useScaleVersor3D"] = True
-    parameters["useScaleSkewVersor3D"] = True
+    # parameters["useRigid"] = True
+    # parameters["useScaleVersor3D"] = True
+    # parameters["useScaleSkewVersor3D"] = True
     parameters["useAffine"] = True
     parameters["maskProcessingMode"] = "ROI"
     parameters["fixedBinaryVolume"] = fixedmaskNode
@@ -488,15 +490,22 @@ def regionsMNI():
     generalRegistration = slicer.modules.brainsfit
     cliNode = slicer.cli.run(generalRegistration, None, parameters)
     
-    labelmapVolumeNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_labels","labelmap":True,"center":True})
-    transform = slicer.util.getFirstNodeByName("Transform2MNI")
-    transformedLabels = slicer.mrmlScene.CopyNode(labelmapVolumeNode)
-    transformedLabels.SetName("transformed_MNI_labels")
-    transformedLabels.ApplyTransformMatrix(transform.GetMatrixTransformToParent())
-    
     logging.info("MNI registration complete.\n")   
             
-        
+def regionsMNI():
+    
+    
+    labelmapPath = os.path.join(mniPath, 'mni_icbm152_CerebrA_tal_nlin_sym_09c.nii') # labelmap
+    
+    transform = linearTransformNode
+    
+    labelmapVolumeNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_labels","labelmap":True,"center":True})
+    labelmapVolumeNode.SetName("transformed_MNI_labels")
+    labelmapVolumeNode.ApplyTransformMatrix(transform.GetMatrixTransformToParent())
+    
+    # labelmapVolumeNode.ApplyTransform(transform.GetTransformToParent())
+    
+
 
 #
 # Autoelectrodes
@@ -633,6 +642,8 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Buttons
         self.ui.applyButton.connect('clicked(bool)', self.onApplyButton)
+        self.ui.pushButton.connect('clicked(bool)', self.onPushButton)
+        
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
@@ -768,6 +779,12 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
             # Compute output
             self.logic.process()
+    
+    def onPushButton(self):
+        with slicer.util.tryWithErrorDisplay("Failed to compute results.", waitCursor=True):
+
+            # Compute output
+            self.logic.regions()
 
 
 
@@ -833,9 +850,14 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         # logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
 
         logging.info("Starting...")
-        regionsMNI()
+        registerMNI()
         findContacts()
-
+        
+    def regions(self):
+        
+        logging.info("Mapping to the MNI space")
+        regionsMNI()
+        logging.info("Mapped to the MNI space")
 
 #
 # AutoelectrodesTest
@@ -878,6 +900,10 @@ class AutoelectrodesTest(ScriptedLoadableModuleTest):
         # import SampleData
         # registerSampleData()
         # inputVolume = SampleData.downloadSample('Autoelectrodes1')
+        
+        testPath = '/Volumes/GoogleDrive/Mi unidad/_PhD/SLICER/test_subject_1/real.mrml'
+        slicer.util.loadScene(testPath)
+        
         self.delayDisplay('Loaded test data set')
 
         # inputScalarRange = inputVolume.GetImageData().GetScalarRange()
