@@ -16,6 +16,8 @@ import os
 from os import listdir
 from os.path import isfile,join
 
+import pandas as pd
+
 try:
     import pandas as pd
 except: 
@@ -156,8 +158,9 @@ def findContacts():
         fidNode = slicer.mrmlScene.GetFirstNodeByName("real-"+Hloc)
         
         # Get the aseg map
-        volumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
-        voxelArray = slicer.util.arrayFromVolume(volumeNode)
+        global asegVolumeNode, asegVoxelArray
+        asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
+        asegVoxelArray = slicer.util.arrayFromVolume(asegVolumeNode)
         
         # All markup's names and positions in RAS coordinates
         markup_names = [fidNode.GetNthFiducialLabel(i) for i in range(fidNode.GetNumberOfFiducials())]
@@ -185,6 +188,7 @@ def findContacts():
         # Goal: Compute the position of the remaining contacts and include them in the monopolar markup list (real-R/L)
         
         # Initialize lists for the markups and their RAS coordinates
+        global monopolar_markups, monopolar_RAS
         monopolar_markups = []
         monopolar_RAS = []
         
@@ -223,8 +227,8 @@ def findContacts():
                         monopolar_markups.append(markup)
                         monopolar_RAS.append(RAS[index])
                         # check location of the contact (WM or not)
-                        ijk_position = RAStoIJK(RAS[index], volumeNode)
-                        anatomic_position = anatomicREL(voxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
+                        ijk_position = RAStoIJK(RAS[index], asegVolumeNode)
+                        anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
                         if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
                             monopolar_markups_WM.append(markup)
                             monopolar_RAS_WM.append(RAS[index])
@@ -246,8 +250,8 @@ def findContacts():
                         
                         fidNode.AddFiducialFromArray(new_position, letter+str(new_digit))
                         
-                        ijk_position = RAStoIJK(new_position, volumeNode)
-                        anatomic_position = anatomicREL(voxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
+                        ijk_position = RAStoIJK(new_position, asegVolumeNode)
+                        anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
                         if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
                             monopolar_markups_WM.append(letter+str(new_digit))
                             monopolar_RAS_WM.append(new_position)
@@ -259,8 +263,8 @@ def findContacts():
                         
                     monopolar_markups.append(markups[index+1])
                     monopolar_RAS.append(RAS[index+1])
-                    ijk_position = RAStoIJK(new_position, volumeNode)
-                    anatomic_position = anatomicREL(voxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
+                    ijk_position = RAStoIJK(new_position, asegVolumeNode)
+                    anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
                     if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
                         monopolar_markups_WM.append(markups[index+1])
                         monopolar_RAS_WM.append(RAS[index+1])
@@ -331,63 +335,7 @@ def findContacts():
             fidNodeE.SetNthFiducialLocked(markupN,True)
         
         logging.info("Monopolar contact placement complete.\n") 
-        
-        # Atlases
-        # ASEG atlas
-        for index,contact in enumerate(monopolar_markups):
-            ras = monopolar_RAS[index]
-            point_ijk = RAStoIJK(ras,volumeNode)
-            aseg_label = anatomicREL(voxelArray[point_ijk[2],point_ijk[1],point_ijk[0]])
-            # print(contact+" "+aseg_label+"\n")
        
-        # # ICBM152  
-        # # Set parameters
-        # mniPath = os.path.join(os.path.dirname(__file__), 'Resources/MNI')
-        # templatePath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a.nii')
-        # labelmapPath = os.path.join(mniPath, 'mni_icbm152_CerebrA_tal_nlin_sym_09c.nii')
-        # movingmaskPath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a_mask.nii')
-        
-        # fixedVolumeNode = slicer.mrmlScene.GetFirstNodeByName("brain")
-        # movingVolumeNode = slicer.util.loadVolume(templatePath,properties={"name":"ICBM152_T1","center":True})
-        # labelmapVolumeNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_labels","labelmap":True,"center":True})
-        
-        # linearTransformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
-        # linearTransformNode.SetName("Transform2MNI")
-        # outputVolumeNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
-        # outputVolumeNode.SetName("ICBM152_registered")
-        
-        # fixedmaskNode = slicer.mrmlScene.GetFirstNodeByName("aseg")
-        # movingmaskNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_mask","labelmap":True,"center":True})
-        
-        # parameters = {}
-        # parameters["fixedVolume"] = fixedVolumeNode
-        # parameters["movingVolume"] = movingVolumeNode
-        # # parameters["samplingPercentage"] = 0.002  # Default sampling percentage of 0.002, to change it, uncomment the next line and change the value
-        # # parameters["splineGridSize"] = [14,10,12] # Default B-spline grid size 14,10,12, to change it, uncomment the next line and change the value
-        # parameters["linearTransform"] = linearTransformNode
-        # parameters["outputVolume"] = outputVolumeNode
-        # parameters["initializeTransformMode"] = "useCenterOfHeadAlign"
-        # parameters["useRigid"] = True
-        # parameters["useScaleVersor3D"] = True
-        # parameters["useScaleSkewVersor3D"] = True
-        # parameters["useAffine"] = True
-        # parameters["maskProcessingMode"] = "ROI"
-        # parameters["fixedBinaryVolume"] = fixedmaskNode
-        # parameters["movingBinaryVolume"] = movingmaskNode
-        # parameters["outputFixedVolumeROI"] = fixedmaskNode
-        # parameters["outputMovingVolumeROI"] = fixedmaskNode
-        # # Execution
-        # generalRegistration = slicer.modules.brainsfit
-        # cliNode = slicer.cli.run(generalRegistration, None, parameters)
-        
-        # logging.info("enter.\n")
-        # transform = slicer.util.getFirstNodeByName("Transform2MNI")
-        # labels = slicer.util.getFirstNodeByName("MNI_labels")
-        # labels.ApplyTransformMatrix(transform.GetMatrixTransformToParent())
-        # transform = slicer.util.getFirstNodeByName("Transform2MNI")
-        # labels = slicer.util.getFirstNodeByName("MNI_labels")
-        # labels.ApplyTransformMatrix(transform.GetMatrixTransformToParent())
-        # logging.info("out.\n")
        
         # Bipolar 
         fidNodeBi = slicer.vtkMRMLMarkupsFiducialNode()
@@ -424,8 +372,8 @@ def findContacts():
                     
                     fidNodeBi.AddFiducialFromArray(middle_point, bi_tag)
                     
-                    ijk_position = RAStoIJK(middle_point, volumeNode)
-                    anatomic_position = anatomicREL(voxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
+                    ijk_position = RAStoIJK(middle_point, asegVolumeNode)
+                    anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
                     if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
                         bipolar_markups_WM.append(bi_tag)
                         bipolar_RAS_WM.append(middle_point)
@@ -494,16 +442,42 @@ def registerMNI():
             
 def regionsMNI():
     
-    
+    # path of the label mapfile
     labelmapPath = os.path.join(mniPath, 'mni_icbm152_CerebrA_tal_nlin_sym_09c.nii') # labelmap
     
+    # Select the transform from the MNI to patient registration 
     transform = linearTransformNode
     
+    # Transform the labelmap to match the patient volume
     labelmapVolumeNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_labels","labelmap":True,"center":True})
     labelmapVolumeNode.SetName("transformed_MNI_labels")
     labelmapVolumeNode.ApplyTransformMatrix(transform.GetMatrixTransformToParent())
     
-    # labelmapVolumeNode.ApplyTransform(transform.GetTransformToParent())
+    # Obtain voxel array of the label map to obtain the number associated to a specific location
+    MNIVoxelArray = slicer.util.arrayFromVolume(labelmapVolumeNode)
+    
+    # Load MNI table relating number tag to area
+    MNI_details = pd.read_csv(os.path.join(mniPath, 'CerebrA_LabelDetails.csv'))
+    
+    # Atlases
+    # Initialize dataframe for the atlases
+    atlas = pd.DataFrame(columns=['Contact', 'Aseg', 'MNI'])
+    # Fill dataframe
+    for index,contact in enumerate(monopolar_markups):
+        ras = monopolar_RAS[index]
+        point_ijk = RAStoIJK(ras,asegVolumeNode)
+        # Aseg
+        aseg_label = anatomicREL(asegVoxelArray[point_ijk[2],point_ijk[1],point_ijk[0]])
+        # MNI
+        mni_label_number = MNIVoxelArray[point_ijk[2],point_ijk[1],point_ijk[0]]
+        mni_label = MNI_details[MNI_details.eq(mni_label_number).any(axis="columns")]["Label Name"].iloc[0]
+        # Fill dataframe
+        df = pd.DataFrame([[contact, aseg_label, mni_label]], columns=['Contact', 'Aseg', 'MNI'])
+        atlas = pd.concat([atlas, df])
+    
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
+        print_atlas = atlas.to_string(index=False)
+        print(print_atlas)
     
 
 
