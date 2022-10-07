@@ -16,8 +16,6 @@ import os
 from os import listdir
 from os.path import isfile,join
 
-import pandas as pd
-
 try:
     import pandas as pd
 except: 
@@ -465,12 +463,39 @@ def regionsMNI():
     # Fill dataframe
     for index,contact in enumerate(monopolar_markups):
         ras = monopolar_RAS[index]
-        point_ijk = RAStoIJK(ras,asegVolumeNode)
         # Aseg
+        point_ijk = RAStoIJK(ras,asegVolumeNode)
         aseg_label = anatomicREL(asegVoxelArray[point_ijk[2],point_ijk[1],point_ijk[0]])
         # MNI
+        point_ijk = RAStoIJK(ras,labelmapVolumeNode)
         mni_label_number = MNIVoxelArray[point_ijk[2],point_ijk[1],point_ijk[0]]
-        mni_label = MNI_details[MNI_details.eq(mni_label_number).any(axis="columns")]["Label Name"].iloc[0]
+        
+        # In case that the label is non-existent. check surroundings
+        surround_index = 1
+        while mni_label_number == 0 and surround_index<5:
+            surroundings = [-surround_index,0,surround_index]
+            areas = []
+            for x in surroundings:
+                for y in surroundings:
+                    for z in surroundings:
+                        try:
+                            areas.append(MNIVoxelArray[point_ijk[2]+x,point_ijk[1]+y,point_ijk[0]+z])
+                        except:
+                            pass
+            mni_label_number = max(set(areas), key = areas.count)
+            surround_index = surround_index+1
+        
+        if mni_label_number != 0:
+            mni_label = MNI_details[MNI_details.eq(mni_label_number).any(axis="columns")]["Label Name"].iloc[0]
+        else:
+            mni_label = "unknown"
+        
+        print(contact)
+        print(point_ijk)
+        print(mni_label_number)
+        print(mni_label)
+        print("\n")
+        
         # Fill dataframe
         df = pd.DataFrame([[contact, aseg_label, mni_label]], columns=['Contact', 'Aseg', 'MNI'])
         atlas = pd.concat([atlas, df])
