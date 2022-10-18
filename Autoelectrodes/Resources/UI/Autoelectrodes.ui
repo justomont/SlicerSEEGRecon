@@ -1,76 +1,121 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>Autoelectrodes</class>
- <widget class="qMRMLWidget" name="Autoelectrodes">
+ <class>extension_test</class>
+ <widget class="qMRMLWidget" name="extension_test">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>532</width>
-    <height>341</height>
+    <width>290</width>
+    <height>334</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="QLabel" name="label_2">
+    <widget class="ctkCollapsibleButton" name="inputsCollapsibleButton">
      <property name="text">
-      <string>Select the markup node:</string>
+      <string>Autoelectrodes</string>
      </property>
+     <layout class="QFormLayout" name="formLayout_2">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label">
+        <property name="toolTip">
+         <string>List where the initial and last contact of the electrodes are defined.</string>
+        </property>
+        <property name="text">
+         <string>Input electrodes:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="qMRMLNodeComboBox" name="inputSelector">
+        <property name="toolTip">
+         <string>Pick the list to generate the electrodes.</string>
+        </property>
+        <property name="nodeTypes">
+         <stringlist>
+          <string>vtkMRMLMarkupsFiducialNode</string>
+         </stringlist>
+        </property>
+        <property name="showChildNodeTypes">
+         <bool>false</bool>
+        </property>
+        <property name="addEnabled">
+         <bool>false</bool>
+        </property>
+        <property name="removeEnabled">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_3">
+        <property name="toolTip">
+         <string>Check the box to generate extra lists with the bipolar montage of the electrodes.</string>
+        </property>
+        <property name="text">
+         <string>Extra montage:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QCheckBox" name="checkBox_bipolar">
+        <property name="toolTip">
+         <string>Check the box to generate extra lists with the bipolar montage of the electrodes.</string>
+        </property>
+        <property name="text">
+         <string>Bipolar</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
    <item>
-    <widget class="qMRMLSegmentSelectorWidget" name="SegmentSelectorWidget">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="acceptDrops">
-      <bool>false</bool>
-     </property>
-     <property name="toolTip">
-      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-     </property>
-     <property name="editEnabled">
-      <bool>false</bool>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="ctkDynamicSpacer" name="DynamicSpacer"/>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="horizontalLayout">
-     <item alignment="Qt::AlignTop">
-      <widget class="QLabel" name="label">
-       <property name="text">
-        <string>Select type of montage:</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <layout class="QVBoxLayout" name="verticalLayout_2">
-       <item alignment="Qt::AlignLeft|Qt::AlignTop">
-        <widget class="QCheckBox" name="checkBox">
-         <property name="text">
-          <string>Monopolar</string>
-         </property>
-        </widget>
-       </item>
-       <item alignment="Qt::AlignLeft|Qt::AlignTop">
-        <widget class="QCheckBox" name="checkBox_2">
-         <property name="text">
-          <string>Bipolar</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <widget class="QPushButton" name="pushButton">
+    <widget class="ctkCollapsibleButton" name="outputsCollapsibleButton">
      <property name="text">
-      <string>Atlas</string>
+      <string>Mapping</string>
      </property>
+     <layout class="QFormLayout" name="formLayout_4">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_2">
+        <property name="text">
+         <string>Fixed volume:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="qMRMLNodeComboBox" name="fixedVolumeSelector">
+        <property name="toolTip">
+         <string>Pick the fixed volume for the registration of the anatomical templates of the electrodes. Ideally, it should be a cropped image of the T1 scan just depicting the brain.</string>
+        </property>
+        <property name="nodeTypes">
+         <stringlist>
+          <string>vtkMRMLScalarVolumeNode</string>
+         </stringlist>
+        </property>
+        <property name="showChildNodeTypes">
+         <bool>false</bool>
+        </property>
+        <property name="noneEnabled">
+         <bool>false</bool>
+        </property>
+        <property name="addEnabled">
+         <bool>false</bool>
+        </property>
+        <property name="removeEnabled">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QPushButton" name="pushButton">
+        <property name="text">
+         <string>Generate table</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
    <item>
@@ -79,10 +124,10 @@
       <bool>false</bool>
      </property>
      <property name="toolTip">
-      <string>Run the algorithm.</string>
+      <string>Generate the position of all the contacts of each electrode.</string>
      </property>
      <property name="text">
-      <string>Autoelectrodes</string>
+      <string>Generate electrodes</string>
      </property>
     </widget>
    </item>
@@ -103,9 +148,15 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>ctkDynamicSpacer</class>
+   <class>ctkCollapsibleButton</class>
    <extends>QWidget</extends>
-   <header>ctkDynamicSpacer.h</header>
+   <header>ctkCollapsibleButton.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>qMRMLNodeComboBox</class>
+   <extends>QWidget</extends>
+   <header>qMRMLNodeComboBox.h</header>
   </customwidget>
   <customwidget>
    <class>qMRMLWidget</class>
@@ -113,12 +164,40 @@
    <header>qMRMLWidget.h</header>
    <container>1</container>
   </customwidget>
-  <customwidget>
-   <class>qMRMLSegmentSelectorWidget</class>
-   <extends>qMRMLWidget</extends>
-   <header>qMRMLSegmentSelectorWidget.h</header>
-  </customwidget>
  </customwidgets>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>extension_test</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>inputSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>122</x>
+     <y>132</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>248</x>
+     <y>61</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>extension_test</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>fixedVolumeSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>82</x>
+     <y>135</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>220</x>
+     <y>161</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

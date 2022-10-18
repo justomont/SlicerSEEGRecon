@@ -1,20 +1,11 @@
-import logging
 import os
-
-import vtk
-
-import slicer
-from slicer.ScriptedLoadableModule import *
-from slicer.util import VTKObservationMixin
-
 import re
+import vtk
+import slicer
+import logging
 import numpy as np
-import csv
 from itertools import compress
-
-import os
-from os import listdir
-from os.path import isfile,join
+from slicer.util import VTKObservationMixin
 
 try:
     import pandas as pd
@@ -139,217 +130,205 @@ def NthFiducialPosition(fidNode,n):
     pos = [0,0,0]
     fidNode.GetNthFiducialPosition(n,pos)
     return pos
-    
 
-def findContacts():
+def findContacts(fidNode,checked_bipolar):
     
-    hemisphere_location = ["L","R"]
-    Hpresent = []
+    # Get the aseg map
+    global asegVolumeNode, asegVoxelArray
+    asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
+    asegVoxelArray = slicer.util.arrayFromVolume(asegVolumeNode)
     
-    for Hloc in hemisphere_location:
-        fidNode = slicer.mrmlScene.GetFirstNodeByName("real-"+Hloc)
-        if fidNode != None:
-            Hpresent.append(Hloc)
-
-    for Hloc in Hpresent:
-        # Get the markup fiducials
-        fidNode = slicer.mrmlScene.GetFirstNodeByName("real-"+Hloc)
+    # All markup's names and positions in RAS coordinates
+    markup_names = [fidNode.GetNthFiducialLabel(i) for i in range(fidNode.GetNumberOfFiducials())]
+    markup_RAS = [NthFiducialPosition(fidNode,i) for i in range(fidNode.GetNumberOfFiducials())]
+    
+    # Remove markups that signal the END of the electrode (wich is not the last contact but the tip of the elctrode, outside of the skull)
+    boolean = [has_numbers(name) for name in markup_names]
+    clean_markup_names = list(compress(markup_names, boolean))
+    clean_markup_RAS = list(compress(markup_RAS, boolean))
+    
+    # Sort the lists alphabetically
+    tuples = zip(*sorted(zip(clean_markup_names, clean_markup_RAS)))
+    markups, RAS = [list(tuple) for tuple in  tuples]
+    
+    # Store also the location of the end of the electrodes just for representational purposes
+    end_boolean = [not element for element in boolean]
+    end_markup_names = list(compress(markup_names, end_boolean))
+    end_markup_RAS = list(compress(markup_RAS, end_boolean))
+    end_tuples = zip(*sorted(zip(end_markup_names, end_markup_RAS)))
+    end_markups, end_RAS = [list(tuple) for tuple in  end_tuples]
+    
+    #############################################################################
+    # Monopolar. The tool just adds the contacts where they really are in space.#
+    #############################################################################
+    # Compute the position of the remaining contacts and include them in the monopolar markup list (real-R/L)
+    
+    # Initialize lists for the markups and their RAS coordinates
+    global monopolar_markups, monopolar_RAS
+    monopolar_markups = []
+    monopolar_RAS = []
+    
+    monopolar_markups_WM = []
+    monopolar_RAS_WM = []
+    fidNodeWM = slicer.vtkMRMLMarkupsFiducialNode()
+    fidNodeWM.SetName("mono-WM")
+    slicer.mrmlScene.AddNode(fidNodeWM)
+    
+    monopolar_markups_P = []
+    monopolar_RAS_P = []
+    fidNodeP = slicer.vtkMRMLMarkupsFiducialNode()
+    fidNodeP.SetName("mono-P")
+    slicer.mrmlScene.AddNode(fidNodeP)
+    
+    monopolar_markups_E = []
+    monopolar_RAS_E = []
+    fidNodeE = slicer.vtkMRMLMarkupsFiducialNode()
+    fidNodeE.SetName("mono-ends")
+    slicer.mrmlScene.AddNode(fidNodeE)
+    
+    # Iterate over all the markups defined by the user
+    for index,markup in enumerate(markups): 
+        if index < len(markups)-1: # There's a -1 one here because the penultimate markup adds the last markup, so there is no need to check the last one
         
-        # Get the aseg map
-        global asegVolumeNode, asegVoxelArray
-        asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
-        asegVoxelArray = slicer.util.arrayFromVolume(asegVolumeNode)
-        
-        # All markup's names and positions in RAS coordinates
-        markup_names = [fidNode.GetNthFiducialLabel(i) for i in range(fidNode.GetNumberOfFiducials())]
-        markup_RAS = [NthFiducialPosition(fidNode,i) for i in range(fidNode.GetNumberOfFiducials())]
-        
-        # Remove markups that signal the END of the electrode (wich is not the last contact but the tip of the elctrode, outside of the skull)
-        boolean = [has_numbers(name) for name in markup_names]
-        clean_markup_names = list(compress(markup_names, boolean))
-        clean_markup_RAS = list(compress(markup_RAS, boolean))
-        
-        # Sort the lists alphabetically
-        tuples = zip(*sorted(zip(clean_markup_names, clean_markup_RAS)))
-        markups, RAS = [list(tuple) for tuple in  tuples]
-        
-        # Store also the location of the end of the electrodes just for representational purposes
-        end_boolean = [not element for element in boolean]
-        end_markup_names = list(compress(markup_names, end_boolean))
-        end_markup_RAS = list(compress(markup_RAS, end_boolean))
-        end_tuples = zip(*sorted(zip(end_markup_names, end_markup_RAS)))
-        end_markups, end_RAS = [list(tuple) for tuple in  end_tuples]
-        
-        #############################################################################
-        # Monopolar. The tool just adds the contacts where they really are in space.#
-        #############################################################################
-        # Goal: Compute the position of the remaining contacts and include them in the monopolar markup list (real-R/L)
-        
-        # Initialize lists for the markups and their RAS coordinates
-        global monopolar_markups, monopolar_RAS
-        monopolar_markups = []
-        monopolar_RAS = []
-        
-        monopolar_markups_WM = []
-        monopolar_RAS_WM = []
-        fidNodeWM = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNodeWM.SetName("real-"+Hloc+"-WM")
-        slicer.mrmlScene.AddNode(fidNodeWM)
-        
-        monopolar_markups_P = []
-        monopolar_RAS_P = []
-        fidNodeP = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNodeP.SetName("real-"+Hloc+"-P")
-        slicer.mrmlScene.AddNode(fidNodeP)
-        
-        monopolar_markups_E = []
-        monopolar_RAS_E = []
-        fidNodeE = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNodeE.SetName("real-"+Hloc+"-ends")
-        slicer.mrmlScene.AddNode(fidNodeE)
-        
-        # Iterate over all the markups defined by the user
-        for index,markup in enumerate(markups): 
-            if index < len(markups)-1: # There's a -1 one here because the penultimate markup adds the last markup, so there is no need to check the last one
+            # Check the letter/name and the number of the selected markup and the next one in the list
+            letter = ''.join([i for i in markup if not i.isdigit()])
+            digit = int(re.search(r'\d+', markup).group())
+            next_letter = ''.join([i for i in markups[index+1] if not i.isdigit()])
+            next_digit = int(re.search(r'\d+', markups[index+1]).group())
             
-                # Check the letter/name and the number of the selected markup and the next one in the list
-                letter = ''.join([i for i in markup if not i.isdigit()])
-                digit = int(re.search(r'\d+', markup).group())
-                next_letter = ''.join([i for i in markups[index+1] if not i.isdigit()])
-                next_digit = int(re.search(r'\d+', markups[index+1]).group())
-                
-                # If they have the same letter we can continue because it means that are part of the same electrode
-                if letter == next_letter:
-                    # add initial contact to the new list
-                    if markup not in monopolar_markups:
-                        monopolar_markups.append(markup)
-                        monopolar_RAS.append(RAS[index])
-                        # check location of the contact (WM or not)
-                        ijk_position = RAStoIJK(RAS[index], asegVolumeNode)
-                        anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
-                        if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
-                            monopolar_markups_WM.append(markup)
-                            monopolar_RAS_WM.append(RAS[index])
-                            fidNodeWM.AddFiducialFromArray(RAS[index], markup)
-                        else:
-                            monopolar_markups_P.append(markup)
-                            monopolar_RAS_P.append(RAS[index])
-                            fidNodeP.AddFiducialFromArray(RAS[index], markup)
-                    # calculate how many markups should be added until the next user-defined markup
-                    additions = next_digit - digit-1
-                    # calculate how distant the markups should be
-                    distance = np.subtract(RAS[index+1], RAS[index])/(additions+1)
-                    # add these new markups
-                    for i in range(additions):
-                        new_digit = digit+i+1
-                        new_position = np.add(RAS[index], distance*(digit+i))
-                        monopolar_markups.append(letter+str(new_digit))
-                        monopolar_RAS.append(new_position)
-                        
-                        fidNode.AddFiducialFromArray(new_position, letter+str(new_digit))
-                        
-                        ijk_position = RAStoIJK(new_position, asegVolumeNode)
-                        anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
-                        if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
-                            monopolar_markups_WM.append(letter+str(new_digit))
-                            monopolar_RAS_WM.append(new_position)
-                            fidNodeWM.AddFiducialFromArray(new_position, letter+str(new_digit))
-                        else:
-                            monopolar_markups_P.append(letter+str(new_digit))
-                            monopolar_RAS_P.append(new_position)
-                            fidNodeP.AddFiducialFromArray(new_position, letter+str(new_digit))
-                        
-                    monopolar_markups.append(markups[index+1])
-                    monopolar_RAS.append(RAS[index+1])
+            # If they have the same letter we can continue because it means that are part of the same electrode
+            if letter == next_letter:
+                # add initial contact to the new list
+                if markup not in monopolar_markups:
+                    monopolar_markups.append(markup)
+                    monopolar_RAS.append(RAS[index])
+                    # check location of the contact (WM or not)
+                    ijk_position = RAStoIJK(RAS[index], asegVolumeNode)
+                    anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
+                    if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
+                        monopolar_markups_WM.append(markup)
+                        monopolar_RAS_WM.append(RAS[index])
+                        fidNodeWM.AddFiducialFromArray(RAS[index], markup)
+                    else:
+                        monopolar_markups_P.append(markup)
+                        monopolar_RAS_P.append(RAS[index])
+                        fidNodeP.AddFiducialFromArray(RAS[index], markup)
+                # calculate how many markups should be added until the next user-defined markup
+                additions = next_digit - digit-1
+                # calculate how distant the markups should be
+                distance = np.subtract(RAS[index+1], RAS[index])/(additions+1)
+                # add these new markups
+                for i in range(additions):
+                    new_digit = digit+i+1
+                    new_position = np.add(RAS[index], distance*(digit+i))
+                    monopolar_markups.append(letter+str(new_digit))
+                    monopolar_RAS.append(new_position)
+                    
+                    fidNode.AddFiducialFromArray(new_position, letter+str(new_digit))
+                    
                     ijk_position = RAStoIJK(new_position, asegVolumeNode)
                     anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
                     if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
-                        monopolar_markups_WM.append(markups[index+1])
-                        monopolar_RAS_WM.append(RAS[index+1])
-                        fidNodeWM.AddFiducialFromArray(RAS[index+1], markups[index+1])
+                        monopolar_markups_WM.append(letter+str(new_digit))
+                        monopolar_RAS_WM.append(new_position)
+                        fidNodeWM.AddFiducialFromArray(new_position, letter+str(new_digit))
                     else:
-                        monopolar_markups_P.append(markups[index+1])
-                        monopolar_RAS_P.append(RAS[index+1])
-                        fidNodeP.AddFiducialFromArray(RAS[index+1], markups[index+1])
+                        monopolar_markups_P.append(letter+str(new_digit))
+                        monopolar_RAS_P.append(new_position)
+                        fidNodeP.AddFiducialFromArray(new_position, letter+str(new_digit))
                     
-                    #Create rulers where the whole electrodes are
-                    rulerNode = slicer.vtkMRMLAnnotationRulerNode()
-                    rulerNode.SetName(letter)
-                    rulerNode.Initialize(slicer.mrmlScene)
-                    rulerNode.SetPosition1(RAS[index])
-                    rulerNode.SetPosition2(RAS[index+1])
-                    if Hloc == "R":
-                        rulerNode.GetDisplayNode().SetColor([0,0,1.])
-                    else:
-                        rulerNode.GetDisplayNode().SetColor([170/255,0,0])
-                    rulerNode.SetDistanceAnnotationScale(0)
-                    rulerNode.GetDisplayNode().SetLineThickness(6)
-                    rulerNode.GetDisplayNode().SetMaxTicks(0)
-                    rulerNode.SetLocked(True)
-                
-                # if the letter is not the same as the next one it means we found the last markup of the electrode, 
-                # thus we can extend this last section to better grpahically represent the electrode
+                monopolar_markups.append(markups[index+1])
+                monopolar_RAS.append(RAS[index+1])
+                ijk_position = RAStoIJK(new_position, asegVolumeNode)
+                anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
+                if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
+                    monopolar_markups_WM.append(markups[index+1])
+                    monopolar_RAS_WM.append(RAS[index+1])
+                    fidNodeWM.AddFiducialFromArray(RAS[index+1], markups[index+1])
                 else:
-                    # compute the vector that defines the line that passes through the last point and the penultimate user-defined markup
-                    pointA = RAS[index-1]
-                    pointB = RAS[index]
-                    l = pointB[0]-pointA[0]
-                    m = pointB[1]-pointA[1]
-                    n = pointB[2]-pointA[2]
-                    AB = np.array([l,m,n])
-                    # select the last point
-                    pointE = end_RAS[end_markups.index(letter)]
-                    l = pointE[0]-pointA[0]
-                    m = pointE[1]-pointA[1]
-                    n = pointE[2]-pointA[2]
-                    AE = np.array([l,m,n])
-                    # project the last markup (E) onto the line generated by AB
-                    P = pointA + np.dot(AE,AB) / np.dot(AB,AB) * AB
-                    # generate projection on Slicer 
-                    fidNodeE.AddFiducialFromArray(P,letter)
-                    # add ruler
-                    rulerNode = slicer.vtkMRMLAnnotationRulerNode()
-                    rulerNode.SetName(letter)
-                    rulerNode.Initialize(slicer.mrmlScene)
-                    rulerNode.SetPosition1(RAS[index])
-                    rulerNode.SetPosition2(P)
-                    if Hloc == "R":
-                        rulerNode.GetDisplayNode().SetColor([0,0,1.])
-                    else:
-                        rulerNode.GetDisplayNode().SetColor([170/255,0,0])
-                    rulerNode.SetDistanceAnnotationScale(0)
-                    rulerNode.GetDisplayNode().SetLineThickness(6)
-                    rulerNode.GetDisplayNode().SetMaxTicks(0)
-                    rulerNode.SetLocked(True)
-                    
-        # Lock all markups
-        for markupN in range(fidNode.GetNumberOfMarkups()):
-            fidNode.SetNthFiducialLocked(markupN,True)
-        for markupN in range(fidNodeWM.GetNumberOfMarkups()):
-            fidNodeWM.SetNthFiducialLocked(markupN,True)
-        for markupN in range(fidNodeP.GetNumberOfMarkups()):
-            fidNodeP.SetNthFiducialLocked(markupN,True)
-        for markupN in range(fidNodeE.GetNumberOfMarkups()):
-            fidNodeE.SetNthFiducialLocked(markupN,True)
-        
-        logging.info("Monopolar contact placement complete.\n") 
-       
-       
+                    monopolar_markups_P.append(markups[index+1])
+                    monopolar_RAS_P.append(RAS[index+1])
+                    fidNodeP.AddFiducialFromArray(RAS[index+1], markups[index+1])
+                
+                #Create rulers where the whole electrodes are
+                rulerNode = slicer.vtkMRMLAnnotationRulerNode()
+                rulerNode.SetName(letter)
+                rulerNode.Initialize(slicer.mrmlScene)
+                rulerNode.SetPosition1(RAS[index])
+                rulerNode.SetPosition2(RAS[index+1])
+                if "R" in fidNode.GetName():
+                    rulerNode.GetDisplayNode().SetColor([170/255,0,0])
+                else:
+                    rulerNode.GetDisplayNode().SetColor([0,0,1.])
+                rulerNode.SetDistanceAnnotationScale(0)
+                rulerNode.GetDisplayNode().SetLineThickness(6)
+                rulerNode.GetDisplayNode().SetMaxTicks(0)
+                rulerNode.SetLocked(True)
+            
+            # if the letter is not the same as the next one it means we found the last markup of the electrode, 
+            # thus we can extend this last section to better grpahically represent the electrode
+            else:
+                # compute the vector that defines the line that passes through the last point and the penultimate user-defined markup
+                pointA = RAS[index-1]
+                pointB = RAS[index]
+                l = pointB[0]-pointA[0]
+                m = pointB[1]-pointA[1]
+                n = pointB[2]-pointA[2]
+                AB = np.array([l,m,n])
+                # select the last point
+                pointE = end_RAS[end_markups.index(letter)]
+                l = pointE[0]-pointA[0]
+                m = pointE[1]-pointA[1]
+                n = pointE[2]-pointA[2]
+                AE = np.array([l,m,n])
+                # project the last markup (E) onto the line generated by AB
+                P = pointA + np.dot(AE,AB) / np.dot(AB,AB) * AB
+                # generate projection on Slicer 
+                fidNodeE.AddFiducialFromArray(P,letter)
+                # add ruler
+                rulerNode = slicer.vtkMRMLAnnotationRulerNode()
+                rulerNode.SetName(letter)
+                rulerNode.Initialize(slicer.mrmlScene)
+                rulerNode.SetPosition1(RAS[index])
+                rulerNode.SetPosition2(P)
+                if "R" in fidNode.GetName():
+                    rulerNode.GetDisplayNode().SetColor([170/255,0,0])
+                else:
+                    rulerNode.GetDisplayNode().SetColor([0,0,1.])
+                rulerNode.SetDistanceAnnotationScale(0)
+                rulerNode.GetDisplayNode().SetLineThickness(6)
+                rulerNode.GetDisplayNode().SetMaxTicks(0)
+                rulerNode.SetLocked(True)
+                
+    # Lock all markups
+    for markupN in range(fidNode.GetNumberOfMarkups()):
+        fidNode.SetNthFiducialLocked(markupN,True)
+    for markupN in range(fidNodeWM.GetNumberOfMarkups()):
+        fidNodeWM.SetNthFiducialLocked(markupN,True)
+    for markupN in range(fidNodeP.GetNumberOfMarkups()):
+        fidNodeP.SetNthFiducialLocked(markupN,True)
+    for markupN in range(fidNodeE.GetNumberOfMarkups()):
+        fidNodeE.SetNthFiducialLocked(markupN,True)
+    
+    logging.info("Monopolar contact placement complete.\n") 
+   
+    
+    if checked_bipolar:
         # Bipolar 
         fidNodeBi = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNodeBi.SetName("Bi-real-"+Hloc)
+        fidNodeBi.SetName("Bipolar")
         slicer.mrmlScene.AddNode(fidNodeBi)
         bipolar_markups = []
         bipolar_RAS = []
         
         fidNodeBi_WM = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNodeBi_WM.SetName("Bi-real-"+Hloc+"_WM")
+        fidNodeBi_WM.SetName("Bi-WM")
         slicer.mrmlScene.AddNode(fidNodeBi_WM)
         bipolar_markups_WM = []
         bipolar_RAS_WM = []
         
         fidNodeBi_P = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNodeBi_P.SetName("Bi-real-"+Hloc+"_P")
+        fidNodeBi_P.SetName("Bi-P")
         slicer.mrmlScene.AddNode(fidNodeBi_P)
         bipolar_markups_P = []
         bipolar_RAS_P = []
@@ -391,7 +370,7 @@ def findContacts():
         
         logging.info("Bipolar contact placement complete.\n") 
         
-def registerMNI():
+def registerMNI(fixedVolumeNode):
     global mniPath, linearTransformNode
     
     # ICBM152  
@@ -401,7 +380,6 @@ def registerMNI():
     movingmaskPath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a_mask.nii') # moving volume mask
     
     # Set parameters
-    fixedVolumeNode = slicer.mrmlScene.GetFirstNodeByName("brain")
     movingVolumeNode = slicer.util.loadVolume(templatePath,properties={"name":"ICBM152_T1","center":True})
     
     linearTransformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
@@ -413,7 +391,6 @@ def registerMNI():
     fixedmaskNode = slicer.mrmlScene.CopyNode(aseg)
     fixedmaskNode.SetName("aseg_mask")
     movingmaskNode = slicer.util.loadVolume(movingmaskPath,properties={"name":"MNI_mask","labelmap":True,"center":True})
-    # movingmaskNode = slicer.util.loadVolume(labelmaskPath,properties={"name":"MNI_mask","labelmap":True,"center":True})
     
     parameters = {}
     parameters["fixedVolume"] = fixedVolumeNode
@@ -490,12 +467,6 @@ def regionsMNI():
         else:
             mni_label = "unknown"
         
-        print(contact)
-        print(point_ijk)
-        print(mni_label_number)
-        print(mni_label)
-        print("\n")
-        
         # Fill dataframe
         df = pd.DataFrame([[contact, aseg_label, mni_label]], columns=['Contact', 'Aseg', 'MNI'])
         atlas = pd.concat([atlas, df])
@@ -504,7 +475,6 @@ def regionsMNI():
         print_atlas = atlas.to_string(index=False)
         print(print_atlas)
     
-
 
 #
 # Autoelectrodes
@@ -517,7 +487,7 @@ class Autoelectrodes(ScriptedLoadableModule):
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
-        self.parent.title = "Auto electrodes"  # TODO: make this more human readable by adding spaces
+        self.parent.title = "Autoelectrodes"  # TODO: make this more human readable by adding spaces
         self.parent.categories = ["SEEG"]  # TODO: set categories (folders where the module shows up in the module selector)
         self.parent.dependencies = []  # TODO: add here list of module names that this module requires
         self.parent.contributors = ["Justo Montoya (Pompeu Fabra University)"]  # TODO: replace with "Firstname Lastname (Organization)"
@@ -633,16 +603,13 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # These connections ensure that whenever user changes some settings on the GUI, that is saved in the MRML scene
         # (in the selected parameter node).
-        # self.ui.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        # self.ui.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        # self.ui.imageThresholdSliderWidget.connect("valueChanged(double)", self.updateParameterNodeFromGUI)
-        # self.ui.invertOutputCheckBox.connect("toggled(bool)", self.updateParameterNodeFromGUI)
-        # self.ui.invertedOutputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.fixedVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.checkBox_bipolar.connect("toggled(bool)", self.updateParameterNodeFromGUI)
 
         # Buttons
         self.ui.applyButton.connect('clicked(bool)', self.onApplyButton)
         self.ui.pushButton.connect('clicked(bool)', self.onPushButton)
-        
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
@@ -693,9 +660,9 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Select default input nodes if nothing is selected yet to save a few clicks for the user
         # if not self._parameterNode.GetNodeReference("InputVolume"):
-            # firstVolumeNode = slicer.mrmlScene.GetFirstNodeByClass("vtkMRMLScalarVolumeNode")
-            # if firstVolumeNode:
-            #     self._parameterNode.SetNodeReferenceID("InputVolume", firstVolumeNode.GetID())
+        #     firstVolumeNode = slicer.mrmlScene.GetFirstNodeByName("real")
+        #     if firstVolumeNode:
+        #         self._parameterNode.SetNodeReferenceID("InputVolume", firstVolumeNode.GetID())
 
     def setParameterNode(self, inputParameterNode):
         """
@@ -731,22 +698,17 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self._updatingGUIFromParameterNode = True
 
         # Update node selectors and sliders
-        # self.ui.inputSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
-        # self.ui.outputSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputVolume"))
-        # self.ui.invertedOutputSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputVolumeInverse"))
-        # self.ui.imageThresholdSliderWidget.value = float(self._parameterNode.GetParameter("Threshold"))
-        # self.ui.invertOutputCheckBox.checked = (self._parameterNode.GetParameter("Invert") == "true")
+        self.ui.inputSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
+        self.ui.fixedVolumeSelector.setCurrentNode(self._parameterNode.GetNodeReference("fixedVolume"))
+        self.ui.checkBox_bipolar.checked = (self._parameterNode.GetParameter("Bipolar") == "true")
 
         # Update buttons states and tooltips
-        # if self._parameterNode.GetNodeReference("InputVolume") and self._parameterNode.GetNodeReference("OutputVolume"):
-        #     self.ui.applyButton.toolTip = "Compute output volume"
-        #     self.ui.applyButton.enabled = True
-        # else:
-        #     self.ui.applyButton.toolTip = "Select input and output volume nodes"
-        #     self.ui.applyButton.enabled = False
-        
-        self.ui.applyButton.toolTip = "Define electrodes"
-        self.ui.applyButton.enabled = True
+        if self._parameterNode.GetNodeReference("InputVolume"):
+            self.ui.applyButton.toolTip = "Generate electrodes"
+            self.ui.applyButton.enabled = True
+        else:
+            self.ui.applyButton.toolTip = "Select input volume node"
+            self.ui.applyButton.enabled = False
 
         # All the GUI updates are done
         self._updatingGUIFromParameterNode = False
@@ -762,11 +724,9 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         wasModified = self._parameterNode.StartModify()  # Modify all properties in a single batch
 
-        # self._parameterNode.SetNodeReferenceID("InputVolume", self.ui.inputSelector.currentNodeID)
-        # self._parameterNode.SetNodeReferenceID("OutputVolume", self.ui.outputSelector.currentNodeID)
-        # self._parameterNode.SetParameter("Threshold", str(self.ui.imageThresholdSliderWidget.value))
-        # self._parameterNode.SetParameter("Invert", "true" if self.ui.invertOutputCheckBox.checked else "false")
-        # self._parameterNode.SetNodeReferenceID("OutputVolumeInverse", self.ui.invertedOutputSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("InputVolume", self.ui.inputSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("fixedVolume", self.ui.fixedVolumeSelector.currentNodeID)
+        self._parameterNode.SetParameter("Bipolar", "true" if self.ui.checkBox_bipolar.checked else "false")
 
         self._parameterNode.EndModify(wasModified)
 
@@ -777,7 +737,10 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         with slicer.util.tryWithErrorDisplay("Failed to compute results.", waitCursor=True):
 
             # Compute output
-            self.logic.process()
+            fidNode = self.ui.inputSelector.currentNode()
+            checked_bipolar = self.ui.checkBox_bipolar.checked
+            fixedVolumeNode = self.ui.fixedVolumeSelector.currentNode()
+            self.logic.process(fidNode,fixedVolumeNode,checked_bipolar)
     
     def onPushButton(self):
         with slicer.util.tryWithErrorDisplay("Failed to compute results.", waitCursor=True):
@@ -811,12 +774,11 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         """
         Initialize parameter node with default settings.
         """
-        # if not parameterNode.GetParameter("Threshold"):
-        #     parameterNode.SetParameter("Threshold", "100.0")
-        # if not parameterNode.GetParameter("Invert"):
-        #     parameterNode.SetParameter("Invert", "false")
+        
+        if not parameterNode.GetParameter("Bipolar"):
+            parameterNode.SetParameter("Bipolar", "false")
 
-    def process(self):
+    def process(self, fidNode,fixedVolumeNode,checked_bipolar):
         """
         Run the processing algorithm.
         Can be used without GUI widget.
@@ -827,31 +789,13 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         :param showResult: show output volume in slice viewers
         """
 
-        # if not inputVolume or not outputVolume:
-        #     raise ValueError("Input or output volume is invalid")
-
-        # import time
-        # startTime = time.time()
-        # logging.info('Processing started')
-        
-        # # Compute the thresholded output volume using the "Threshold Scalar Volume" CLI module
-        # cliParams = {
-        #     'InputVolume': inputVolume.GetID(),
-        #     'OutputVolume': outputVolume.GetID(),
-        #     'ThresholdValue': imageThreshold,
-        #     'ThresholdType': 'Above' if invert else 'Below'
-        # }
-        # cliNode = slicer.cli.run(slicer.modules.thresholdscalarvolume, None, cliParams, wait_for_completion=True, update_display=showResult)
-        # # We don't need the CLI module node anymore, remove it to not clutter the scene with it
-        # slicer.mrmlScene.RemoveNode(cliNode)
-
-        # stopTime = time.time()
-        # logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
+        if not fidNode or not fixedVolumeNode:
+            raise ValueError("Please indicate inputs")
 
         logging.info("Starting...")
-        registerMNI()
-        findContacts()
-        
+        registerMNI(fixedVolumeNode)
+        findContacts(fidNode,checked_bipolar)
+    
     def regions(self):
         
         logging.info("Mapping to the MNI space")
@@ -895,37 +839,17 @@ class AutoelectrodesTest(ScriptedLoadableModuleTest):
         self.delayDisplay("Starting the test")
 
         # Get/create input data
-
-        # import SampleData
-        # registerSampleData()
-        # inputVolume = SampleData.downloadSample('Autoelectrodes1')
-        
         testPath = '/Volumes/GoogleDrive/Mi unidad/_PhD/SLICER/test_subject_1/real.mrml'
         slicer.util.loadScene(testPath)
         
         self.delayDisplay('Loaded test data set')
 
-        # inputScalarRange = inputVolume.GetImageData().GetScalarRange()
-        # self.assertEqual(inputScalarRange[0], 0)
-        # self.assertEqual(inputScalarRange[1], 695)
-
-        # outputVolume = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
-        # threshold = 100
 
         # Test the module logic
 
         logic = AutoelectrodesLogic()
 
-        # Test algorithm with non-inverted threshold
+        # Test algorithm
         logic.process()
-        # outputScalarRange = outputVolume.GetImageData().GetScalarRange()
-        # self.assertEqual(outputScalarRange[0], inputScalarRange[0])
-        # self.assertEqual(outputScalarRange[1], threshold)
-
-        # # Test algorithm with inverted threshold
-        # logic.process(inputVolume, outputVolume, threshold, False)
-        # outputScalarRange = outputVolume.GetImageData().GetScalarRange()
-        # self.assertEqual(outputScalarRange[0], inputScalarRange[0])
-        # self.assertEqual(outputScalarRange[1], inputScalarRange[1])
-
+        
         self.delayDisplay('Test passed')
