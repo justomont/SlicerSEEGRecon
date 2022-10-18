@@ -1,11 +1,20 @@
-import os
-import re
-import vtk
-import slicer
 import logging
-import numpy as np
-from itertools import compress
+import os
+
+import vtk
+
+import slicer
+from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
+
+import re
+import numpy as np
+import csv
+from itertools import compress
+
+import os
+from os import listdir
+from os.path import isfile,join
 
 try:
     import pandas as pd
@@ -130,8 +139,21 @@ def NthFiducialPosition(fidNode,n):
     pos = [0,0,0]
     fidNode.GetNthFiducialPosition(n,pos)
     return pos
+    
 
 def findContacts(fidNode,checked_bipolar):
+    
+    # hemisphere_location = ["L","R"]
+    # Hpresent = []
+    
+    # for Hloc in hemisphere_location:
+    #     fidNode = slicer.mrmlScene.GetFirstNodeByName("real-"+Hloc)
+    #     if fidNode != None:
+    #         Hpresent.append(Hloc)
+
+    # for Hloc in Hpresent:
+    # Get the markup fiducials
+    # fidNode = slicer.mrmlScene.GetFirstNodeByName("real-"+Hloc)
     
     # Get the aseg map
     global asegVolumeNode, asegVoxelArray
@@ -161,7 +183,7 @@ def findContacts(fidNode,checked_bipolar):
     #############################################################################
     # Monopolar. The tool just adds the contacts where they really are in space.#
     #############################################################################
-    # Compute the position of the remaining contacts and include them in the monopolar markup list (real-R/L)
+    # Goal: Compute the position of the remaining contacts and include them in the monopolar markup list (real-R/L)
     
     # Initialize lists for the markups and their RAS coordinates
     global monopolar_markups, monopolar_RAS
@@ -380,6 +402,7 @@ def registerMNI(fixedVolumeNode):
     movingmaskPath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a_mask.nii') # moving volume mask
     
     # Set parameters
+    # fixedVolumeNode = slicer.mrmlScene.GetFirstNodeByName("brain")
     movingVolumeNode = slicer.util.loadVolume(templatePath,properties={"name":"ICBM152_T1","center":True})
     
     linearTransformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
@@ -391,6 +414,7 @@ def registerMNI(fixedVolumeNode):
     fixedmaskNode = slicer.mrmlScene.CopyNode(aseg)
     fixedmaskNode.SetName("aseg_mask")
     movingmaskNode = slicer.util.loadVolume(movingmaskPath,properties={"name":"MNI_mask","labelmap":True,"center":True})
+    # movingmaskNode = slicer.util.loadVolume(labelmaskPath,properties={"name":"MNI_mask","labelmap":True,"center":True})
     
     parameters = {}
     parameters["fixedVolume"] = fixedVolumeNode
@@ -467,6 +491,12 @@ def regionsMNI():
         else:
             mni_label = "unknown"
         
+        # print(contact)
+        # print(point_ijk)
+        # print(mni_label_number)
+        # print(mni_label)
+        # print("\n")
+        
         # Fill dataframe
         df = pd.DataFrame([[contact, aseg_label, mni_label]], columns=['Contact', 'Aseg', 'MNI'])
         atlas = pd.concat([atlas, df])
@@ -475,6 +505,7 @@ def regionsMNI():
         print_atlas = atlas.to_string(index=False)
         print(print_atlas)
     
+
 
 #
 # Autoelectrodes
@@ -605,11 +636,16 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # (in the selected parameter node).
         self.ui.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         self.ui.fixedVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        # self.ui.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        # self.ui.imageThresholdSliderWidget.connect("valueChanged(double)", self.updateParameterNodeFromGUI)
         self.ui.checkBox_bipolar.connect("toggled(bool)", self.updateParameterNodeFromGUI)
+        # self.ui.checkBox_mapping.connect("toggled(bool)", self.updateParameterNodeFromGUI)
+        # self.ui.invertedOutputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
 
         # Buttons
         self.ui.applyButton.connect('clicked(bool)', self.onApplyButton)
         self.ui.pushButton.connect('clicked(bool)', self.onPushButton)
+        
 
         # Make sure parameter node is initialized (needed for module reload)
         self.initializeParameterNode()
@@ -700,7 +736,12 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # Update node selectors and sliders
         self.ui.inputSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
         self.ui.fixedVolumeSelector.setCurrentNode(self._parameterNode.GetNodeReference("fixedVolume"))
+        
+        # self.ui.outputSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputVolume"))
+        # self.ui.invertedOutputSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputVolumeInverse"))
+        # self.ui.imageThresholdSliderWidget.value = float(self._parameterNode.GetParameter("Threshold"))
         self.ui.checkBox_bipolar.checked = (self._parameterNode.GetParameter("Bipolar") == "true")
+        # self.ui.checkBox_mapping.checked = (self._parameterNode.GetParameter("Mapping") == "true")
 
         # Update buttons states and tooltips
         if self._parameterNode.GetNodeReference("InputVolume"):
@@ -726,7 +767,12 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self._parameterNode.SetNodeReferenceID("InputVolume", self.ui.inputSelector.currentNodeID)
         self._parameterNode.SetNodeReferenceID("fixedVolume", self.ui.fixedVolumeSelector.currentNodeID)
+        
+        # self._parameterNode.SetNodeReferenceID("OutputVolume", self.ui.outputSelector.currentNodeID)
+        # self._parameterNode.SetParameter("Threshold", str(self.ui.imageThresholdSliderWidget.value))
         self._parameterNode.SetParameter("Bipolar", "true" if self.ui.checkBox_bipolar.checked else "false")
+        # self._parameterNode.SetParameter("Mapping", "true" if self.ui.checkBox_mapping.checked else "false")
+        # self._parameterNode.SetNodeReferenceID("OutputVolumeInverse", self.ui.invertedOutputSelector.currentNodeID)
 
         self._parameterNode.EndModify(wasModified)
 
@@ -739,13 +785,18 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             # Compute output
             fidNode = self.ui.inputSelector.currentNode()
             checked_bipolar = self.ui.checkBox_bipolar.checked
+            
+            # checked_mapping = self.ui.checkBox_mapping.checked
             fixedVolumeNode = self.ui.fixedVolumeSelector.currentNode()
+            
             self.logic.process(fidNode,fixedVolumeNode,checked_bipolar)
+            # self.logic.regions()
     
     def onPushButton(self):
         with slicer.util.tryWithErrorDisplay("Failed to compute results.", waitCursor=True):
 
             # Compute output
+            # fixedVolumeNode = self.ui.fixedVolumeSelector.currentNode()
             self.logic.regions()
 
 
@@ -774,7 +825,8 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         """
         Initialize parameter node with default settings.
         """
-        
+        # if not parameterNode.GetParameter("Threshold"):
+        #     parameterNode.SetParameter("Threshold", "100.0")
         if not parameterNode.GetParameter("Bipolar"):
             parameterNode.SetParameter("Bipolar", "false")
 
@@ -789,8 +841,26 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         :param showResult: show output volume in slice viewers
         """
 
-        if not fidNode or not fixedVolumeNode:
-            raise ValueError("Please indicate inputs")
+        # if not inputVolume or not outputVolume:
+        #     raise ValueError("Input or output volume is invalid")
+
+        # import time
+        # startTime = time.time()
+        # logging.info('Processing started')
+        
+        # # Compute the thresholded output volume using the "Threshold Scalar Volume" CLI module
+        # cliParams = {
+        #     'InputVolume': inputVolume.GetID(),
+        #     'OutputVolume': outputVolume.GetID(),
+        #     'ThresholdValue': imageThreshold,
+        #     'ThresholdType': 'Above' if invert else 'Below'
+        # }
+        # cliNode = slicer.cli.run(slicer.modules.thresholdscalarvolume, None, cliParams, wait_for_completion=True, update_display=showResult)
+        # # We don't need the CLI module node anymore, remove it to not clutter the scene with it
+        # slicer.mrmlScene.RemoveNode(cliNode)
+
+        # stopTime = time.time()
+        # logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
 
         logging.info("Starting...")
         registerMNI(fixedVolumeNode)
@@ -839,17 +909,37 @@ class AutoelectrodesTest(ScriptedLoadableModuleTest):
         self.delayDisplay("Starting the test")
 
         # Get/create input data
+
+        # import SampleData
+        # registerSampleData()
+        # inputVolume = SampleData.downloadSample('Autoelectrodes1')
+        
         testPath = '/Volumes/GoogleDrive/Mi unidad/_PhD/SLICER/test_subject_1/real.mrml'
         slicer.util.loadScene(testPath)
         
         self.delayDisplay('Loaded test data set')
 
+        # inputScalarRange = inputVolume.GetImageData().GetScalarRange()
+        # self.assertEqual(inputScalarRange[0], 0)
+        # self.assertEqual(inputScalarRange[1], 695)
+
+        # outputVolume = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
+        # threshold = 100
 
         # Test the module logic
 
         logic = AutoelectrodesLogic()
 
-        # Test algorithm
+        # Test algorithm with non-inverted threshold
         logic.process()
-        
+        # outputScalarRange = outputVolume.GetImageData().GetScalarRange()
+        # self.assertEqual(outputScalarRange[0], inputScalarRange[0])
+        # self.assertEqual(outputScalarRange[1], threshold)
+
+        # # Test algorithm with inverted threshold
+        # logic.process(inputVolume, outputVolume, threshold, False)
+        # outputScalarRange = outputVolume.GetImageData().GetScalarRange()
+        # self.assertEqual(outputScalarRange[0], inputScalarRange[0])
+        # self.assertEqual(outputScalarRange[1], inputScalarRange[1])
+
         self.delayDisplay('Test passed')
