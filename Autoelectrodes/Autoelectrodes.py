@@ -16,6 +16,8 @@ import os
 from os import listdir
 from os.path import isfile,join
 
+import time
+
 try:
     import pandas as pd
 except: 
@@ -143,18 +145,6 @@ def NthFiducialPosition(fidNode,n):
 
 def findContacts(fidNode,checked_bipolar):
     
-    # hemisphere_location = ["L","R"]
-    # Hpresent = []
-    
-    # for Hloc in hemisphere_location:
-    #     fidNode = slicer.mrmlScene.GetFirstNodeByName("real-"+Hloc)
-    #     if fidNode != None:
-    #         Hpresent.append(Hloc)
-
-    # for Hloc in Hpresent:
-    # Get the markup fiducials
-    # fidNode = slicer.mrmlScene.GetFirstNodeByName("real-"+Hloc)
-    
     # Get the aseg map
     global asegVolumeNode, asegVoxelArray
     asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
@@ -278,10 +268,7 @@ def findContacts(fidNode,checked_bipolar):
                 rulerNode.Initialize(slicer.mrmlScene)
                 rulerNode.SetPosition1(RAS[index])
                 rulerNode.SetPosition2(RAS[index+1])
-                if "R" in fidNode.GetName():
-                    rulerNode.GetDisplayNode().SetColor([170/255,0,0])
-                else:
-                    rulerNode.GetDisplayNode().SetColor([0,0,1.])
+                rulerNode.GetDisplayNode().SetColor([85/255,170/255,127/255])
                 rulerNode.SetDistanceAnnotationScale(0)
                 rulerNode.GetDisplayNode().SetLineThickness(6)
                 rulerNode.GetDisplayNode().SetMaxTicks(0)
@@ -313,10 +300,7 @@ def findContacts(fidNode,checked_bipolar):
                 rulerNode.Initialize(slicer.mrmlScene)
                 rulerNode.SetPosition1(RAS[index])
                 rulerNode.SetPosition2(P)
-                if "R" in fidNode.GetName():
-                    rulerNode.GetDisplayNode().SetColor([170/255,0,0])
-                else:
-                    rulerNode.GetDisplayNode().SetColor([0,0,1.])
+                rulerNode.GetDisplayNode().SetColor([85/255,170/255,127/255])
                 rulerNode.SetDistanceAnnotationScale(0)
                 rulerNode.GetDisplayNode().SetLineThickness(6)
                 rulerNode.GetDisplayNode().SetMaxTicks(0)
@@ -332,6 +316,7 @@ def findContacts(fidNode,checked_bipolar):
     for markupN in range(fidNodeE.GetNumberOfMarkups()):
         fidNodeE.SetNthFiducialLocked(markupN,True)
     
+    fidNode.GetDisplayNode().SetColor([85/255,170/255,127/255])
     logging.info("Monopolar contact placement complete.\n") 
    
     
@@ -439,7 +424,7 @@ def registerMNI(fixedVolumeNode):
     
     logging.info("MNI registration complete.\n")   
             
-def regionsMNI():
+def regionsMNI(destinyDirectory):
     
     # path of the label mapfile
     labelmapPath = os.path.join(mniPath, 'mni_icbm152_CerebrA_tal_nlin_sym_09c.nii') # labelmap
@@ -461,9 +446,17 @@ def regionsMNI():
     # Atlases
     # Initialize dataframe for the atlases
     atlas = pd.DataFrame(columns=['Contact', 'Aseg', 'MNI'])
+    
+    # Inverse transform to compute the MNI coordinates of each contact
+    worldToMniTransform = vtk.vtkGeneralTransform()
+    transform.GetTransformToWorld(worldToMniTransform)
+    
     # Fill dataframe
     for index,contact in enumerate(monopolar_markups):
+        #  transform ras to mni
         ras = monopolar_RAS[index]
+        mni = [0,0,0]
+        worldToMniTransform.TransformPoint(ras, mni)
         # Aseg
         point_ijk = RAStoIJK(ras,asegVolumeNode)
         aseg_label = anatomicREL(asegVoxelArray[point_ijk[2],point_ijk[1],point_ijk[0]])
@@ -490,18 +483,18 @@ def regionsMNI():
             mni_label = MNI_details[MNI_details.eq(mni_label_number).any(axis="columns")]["Label Name"].iloc[0]
         else:
             mni_label = "unknown"
-        
-        # print(contact)
-        # print(point_ijk)
-        # print(mni_label_number)
-        # print(mni_label)
-        # print("\n")
-        
+
         # Fill dataframe
-        df = pd.DataFrame([[contact, aseg_label, mni_label]], columns=['Contact', 'Aseg', 'MNI'])
+        df = pd.DataFrame([[contact, aseg_label, mni_label, round(mni[0]), round(mni[1]), round(mni[2])]], columns=['Contact', 'Aseg', 'MNI', 'X_mni', 'Y_mni', 'Z_mni'])
         atlas = pd.concat([atlas, df])
     
+    
+
+    
+    
+    # Save the files
     with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
+        atlas.to_csv(path_or_buf=destinyDirectory+"/electrodes.csv", index=False, index_label=False)
         print_atlas = atlas.to_string(index=False)
         print(print_atlas)
     
@@ -641,6 +634,7 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.checkBox_bipolar.connect("toggled(bool)", self.updateParameterNodeFromGUI)
         # self.ui.checkBox_mapping.connect("toggled(bool)", self.updateParameterNodeFromGUI)
         # self.ui.invertedOutputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.DirectoryButton.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
 
         # Buttons
         self.ui.applyButton.connect('clicked(bool)', self.onApplyButton)
@@ -742,6 +736,7 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # self.ui.imageThresholdSliderWidget.value = float(self._parameterNode.GetParameter("Threshold"))
         self.ui.checkBox_bipolar.checked = (self._parameterNode.GetParameter("Bipolar") == "true")
         # self.ui.checkBox_mapping.checked = (self._parameterNode.GetParameter("Mapping") == "true")
+        self.ui.DirectoryButton.directory = str(self._parameterNode.GetParameter("Directory"))
 
         # Update buttons states and tooltips
         if self._parameterNode.GetNodeReference("InputVolume"):
@@ -769,7 +764,7 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self._parameterNode.SetNodeReferenceID("fixedVolume", self.ui.fixedVolumeSelector.currentNodeID)
         
         # self._parameterNode.SetNodeReferenceID("OutputVolume", self.ui.outputSelector.currentNodeID)
-        # self._parameterNode.SetParameter("Threshold", str(self.ui.imageThresholdSliderWidget.value))
+        self._parameterNode.SetParameter("Directory", str(self.ui.DirectoryButton.directory))
         self._parameterNode.SetParameter("Bipolar", "true" if self.ui.checkBox_bipolar.checked else "false")
         # self._parameterNode.SetParameter("Mapping", "true" if self.ui.checkBox_mapping.checked else "false")
         # self._parameterNode.SetNodeReferenceID("OutputVolumeInverse", self.ui.invertedOutputSelector.currentNodeID)
@@ -791,13 +786,15 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             
             self.logic.process(fidNode,fixedVolumeNode,checked_bipolar)
             # self.logic.regions()
+            
+            # print(self.ui.DirectoryButton.directory)
     
     def onPushButton(self):
         with slicer.util.tryWithErrorDisplay("Failed to compute results.", waitCursor=True):
 
             # Compute output
-            # fixedVolumeNode = self.ui.fixedVolumeSelector.currentNode()
-            self.logic.regions()
+            destinyDirectory = self.ui.DirectoryButton.directory
+            self.logic.regions(destinyDirectory)
 
 
 
@@ -834,43 +831,28 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         """
         Run the processing algorithm.
         Can be used without GUI widget.
-        :param inputVolume: volume to be thresholded
-        :param outputVolume: thresholding result
-        :param imageThreshold: values above/below this threshold will be set to 0
-        :param invert: if True then values above the threshold will be set to 0, otherwise values below are set to 0
-        :param showResult: show output volume in slice viewers
+        :param fidNode: Markup node where the start and ending contacts of the electrodes to be processed are
+        :param fixedVolumeNode: Volume node to be used as fixed volume for the MNI registration of the brain
+        :param checked_bipolar: boolean to compute the bipolar montage of the electrodes too
         """
 
-        # if not inputVolume or not outputVolume:
-        #     raise ValueError("Input or output volume is invalid")
+        if not fidNode or not fixedVolumeNode:
+            raise ValueError("Input volume or fixed volume is invalid")
 
-        # import time
-        # startTime = time.time()
-        # logging.info('Processing started')
+        startTime = time.time()
+        logging.info("Processing electrodes...")
         
-        # # Compute the thresholded output volume using the "Threshold Scalar Volume" CLI module
-        # cliParams = {
-        #     'InputVolume': inputVolume.GetID(),
-        #     'OutputVolume': outputVolume.GetID(),
-        #     'ThresholdValue': imageThreshold,
-        #     'ThresholdType': 'Above' if invert else 'Below'
-        # }
-        # cliNode = slicer.cli.run(slicer.modules.thresholdscalarvolume, None, cliParams, wait_for_completion=True, update_display=showResult)
-        # # We don't need the CLI module node anymore, remove it to not clutter the scene with it
-        # slicer.mrmlScene.RemoveNode(cliNode)
-
-        # stopTime = time.time()
-        # logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
-
-        logging.info("Starting...")
         registerMNI(fixedVolumeNode)
         findContacts(fidNode,checked_bipolar)
-    
-    def regions(self):
         
-        logging.info("Mapping to the MNI space")
-        regionsMNI()
-        logging.info("Mapped to the MNI space")
+        stopTime = time.time()
+        logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
+    
+    def regions(self,destinyDirectory):
+        
+        logging.info("Mapping electrodes into the MNI space...")
+        
+        regionsMNI(destinyDirectory)
 
 #
 # AutoelectrodesTest
