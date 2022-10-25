@@ -162,16 +162,10 @@ def findContacts(fidNode,checked_bipolar):
     # Sort the lists alphabetically
     tuples = zip(*sorted(zip(clean_markup_names, clean_markup_RAS)))
     mu, RAS = [list(tuple) for tuple in  tuples]
-    # print(mu)
-    # print(RAS)
-    # print("\n")
     markups = ["{}{:0>2.0f}".format(''.join([i for i in markup if not i.isdigit()]),int(re.search(r'\d+', markup).group()))  for markup in mu]
-    # markups.sort()
     markups = zip(*sorted(zip(markups,RAS), key=lambda item: (int(item.partition(' ')[0]) if item[0].isdigit() else float('inf'), item)))
     markups, RAS = [list(tuple) for tuple in  markups]
-    # print(markups)
-    # print(RAS)
-    # print("\n")
+
     
     # Store also the location of the end of the electrodes just for representational purposes
     end_boolean = [not element for element in boolean]
@@ -209,16 +203,13 @@ def findContacts(fidNode,checked_bipolar):
     slicer.mrmlScene.AddNode(fidNodeE)
     
     # Iterate over all the markups defined by the user
+    ruler_done_names = []
     for index,markup in enumerate(markups): 
         if index < len(markups)-1: # There's a -1 one here because the penultimate markup adds the last markup, so there is no need to check the last one
         
             # Check the letter/name and the number of the selected markup and the next one in the list
             letter = ''.join([i for i in markup if not i.isdigit()])
             digit = int(re.search(r'\d+', markup).group())
-            
-            # print(letter)
-            # print(digit)
-            
             next_letter = ''.join([i for i in markups[index+1] if not i.isdigit()])
             next_digit = int(re.search(r'\d+', markups[index+1]).group())
             
@@ -279,11 +270,25 @@ def findContacts(fidNode,checked_bipolar):
                 
                 #Create rulers where the whole electrodes are
                 rulerNode = slicer.vtkMRMLAnnotationRulerNode()
-                rulerNode.SetName(letter)
+                
+                rulerName = letter
+                if rulerName not in ruler_done_names: 
+                    ruler_done_names.append(rulerName)
+                else:
+                    print("else")
+                    i=0
+                    while rulerName in ruler_done_names:
+                        i +=1
+                        rulerName = '%s_%i' % (letter, i)
+                    ruler_done_names.append(rulerName)
+                rulerNode.SetName(rulerName)
                 rulerNode.Initialize(slicer.mrmlScene)
                 rulerNode.SetPosition1(RAS[index])
                 rulerNode.SetPosition2(RAS[index+1])
-                rulerNode.GetDisplayNode().SetColor([85/255,170/255,127/255])
+                if RAS[index][0] > 0:
+                    rulerNode.GetDisplayNode().SetColor([0/255,85/255,225/255])
+                else:
+                    rulerNode.GetDisplayNode().SetColor([170/255,0/255,0/255])
                 rulerNode.SetDistanceAnnotationScale(0)
                 rulerNode.GetDisplayNode().SetLineThickness(6)
                 rulerNode.GetDisplayNode().SetMaxTicks(0)
@@ -311,12 +316,26 @@ def findContacts(fidNode,checked_bipolar):
                 fidNodeE.AddFiducialFromArray(P,letter)
                 # add ruler
                 rulerNode = slicer.vtkMRMLAnnotationRulerNode()
-                rulerNode.SetName(letter)
+                
+                rulerName = letter
+                if rulerName not in ruler_done_names: 
+                    ruler_done_names.append(rulerName)
+                else:
+                    print("else")
+                    i=0
+                    while rulerName in ruler_done_names:
+                        i +=1
+                        rulerName = '%s_%i' % (letter, i)
+                    ruler_done_names.append(rulerName)
+                rulerNode.SetName(rulerName)
                 rulerNode.Initialize(slicer.mrmlScene)
                 rulerNode.SetPosition1(RAS[index])
                 
                 rulerNode.SetPosition2(P)
-                rulerNode.GetDisplayNode().SetColor([85/255,170/255,127/255])
+                if P[0] > 0:
+                    rulerNode.GetDisplayNode().SetColor([0/255,85/255,225/255])
+                else:
+                    rulerNode.GetDisplayNode().SetColor([170/255,0/255,0/255])
                 rulerNode.SetDistanceAnnotationScale(0)
                 rulerNode.GetDisplayNode().SetLineThickness(6)
                 rulerNode.GetDisplayNode().SetMaxTicks(0)
@@ -341,12 +360,26 @@ def findContacts(fidNode,checked_bipolar):
             fidNodeE.AddFiducialFromArray(P,letter)
             # add ruler
             rulerNode = slicer.vtkMRMLAnnotationRulerNode()
-            rulerNode.SetName(letter)
+            
+            rulerName = letter
+            if rulerName not in ruler_done_names: 
+                ruler_done_names.append(rulerName)
+            else:
+                print("else")
+                i=0
+                while rulerName in ruler_done_names:
+                    i +=1
+                    rulerName = '%s_%i' % (letter, i)
+                ruler_done_names.append(rulerName)
+            rulerNode.SetName(rulerName)
             rulerNode.Initialize(slicer.mrmlScene)
             rulerNode.SetPosition1(RAS[index])
             
             rulerNode.SetPosition2(P)
-            rulerNode.GetDisplayNode().SetColor([85/255,170/255,127/255])
+            if P[0] > 0:
+                rulerNode.GetDisplayNode().SetColor([0/255,85/255,225/255])
+            else:
+                rulerNode.GetDisplayNode().SetColor([170/255,0/255,0/255])
             rulerNode.SetDistanceAnnotationScale(0)
             rulerNode.GetDisplayNode().SetLineThickness(6)
             rulerNode.GetDisplayNode().SetMaxTicks(0)
@@ -362,7 +395,40 @@ def findContacts(fidNode,checked_bipolar):
     for markupN in range(fidNodeE.GetNumberOfMarkups()):
         fidNodeE.SetNthFiducialLocked(markupN,True)
     
-    fidNode.GetDisplayNode().SetColor([85/255,170/255,127/255])
+    if P[0] > 0:
+        # Color
+        fidNode.GetDisplayNode().SetColor([0/255,85/255,225/255])
+        fidNodeWM.GetDisplayNode().SetColor([0/255,85/255,225/255])
+        fidNodeP.GetDisplayNode().SetColor([0/255,85/255,225/255])
+        fidNodeE.GetDisplayNode().SetColor([0/255,85/255,225/255])
+    else:
+        fidNode.GetDisplayNode().SetColor([170/255,0/255,0/255])
+        fidNodeWM.GetDisplayNode().SetColor([170/255,0/255,0/255])
+        fidNodeP.GetDisplayNode().SetColor([170/255,0/255,0/255])
+        fidNodeE.GetDisplayNode().SetColor([170/255,0/255,0/255])
+    
+    # Gliph type
+    fidNode.GetDisplayNode().SetGlyphType(6)
+    fidNode.GetDisplayNode().SetGlyphScale(5)
+    fidNode.GetDisplayNode().SetTextScale(4)
+    
+    fidNodeWM.GetDisplayNode().SetGlyphType(6)
+    fidNodeWM.GetDisplayNode().SetGlyphScale(5)
+    fidNodeWM.GetDisplayNode().SetTextScale(4)
+    fidNodeWM.GetDisplayNode().SetVisibility(False)
+    
+    fidNodeP.GetDisplayNode().SetGlyphType(6)
+    fidNodeP.GetDisplayNode().SetGlyphScale(5)
+    fidNodeP.GetDisplayNode().SetTextScale(4)
+    fidNodeWM.GetDisplayNode().SetVisibility(False)
+    
+    fidNodeE.GetDisplayNode().SetGlyphType(6)
+    fidNodeE.GetDisplayNode().SetGlyphScale(5)
+    fidNodeE.GetDisplayNode().SetTextScale(4)
+    fidNodeWM.GetDisplayNode().SetVisibility(False)
+    
+    fidNode.GetDisplayNode().SetVisibility(True)
+    
     logging.info("Monopolar contact placement complete.\n") 
    
     
@@ -421,6 +487,28 @@ def findContacts(fidNode,checked_bipolar):
         for markupN in range(fidNodeBi_P.GetNumberOfMarkups()):
             fidNodeBi_P.SetNthFiducialLocked(markupN,True)
         
+        if P[0] > 0:
+            fidNodeBi.GetDisplayNode().SetColor([0/255,85/255,225/255])
+            fidNodeBi_WM.GetDisplayNode().SetColor([0/255,85/255,225/255])
+            fidNodeBi_P.GetDisplayNode().SetColor([0/255,85/255,225/255])
+        else:
+            fidNodeBi.GetDisplayNode().SetColor([170/255,0/255,0/255])
+            fidNodeBi_WM.GetDisplayNode().SetColor([170/255,0/255,0/255])
+            fidNodeBi_P.GetDisplayNode().SetColor([170/255,0/255,0/255])
+        
+        # Gliph type
+        fidNodeBi.GetDisplayNode().SetGlyphType(6)
+        fidNodeBi.GetDisplayNode().SetGlyphScale(5)
+        fidNodeBi.GetDisplayNode().SetTextScale(4)
+        
+        fidNodeBi_WM.GetDisplayNode().SetGlyphType(6)
+        fidNodeBi_WM.GetDisplayNode().SetGlyphScale(5)
+        fidNodeBi_WM.GetDisplayNode().SetTextScale(4)
+        
+        fidNodeBi_P.GetDisplayNode().SetGlyphType(6)
+        fidNodeBi_P.GetDisplayNode().SetGlyphScale(5)
+        fidNodeBi_P.GetDisplayNode().SetTextScale(4)
+        
         logging.info("Bipolar contact placement complete.\n") 
         
 def registerMNI(fixedVolumeNode):
@@ -433,7 +521,6 @@ def registerMNI(fixedVolumeNode):
     movingmaskPath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a_mask.nii') # moving volume mask
     
     # Set parameters
-    # fixedVolumeNode = slicer.mrmlScene.GetFirstNodeByName("brain")
     movingVolumeNode = slicer.util.loadVolume(templatePath,properties={"name":"ICBM152_T1","center":True})
     
     linearTransformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
@@ -462,7 +549,6 @@ def registerMNI(fixedVolumeNode):
     parameters["movingBinaryVolume"] = movingmaskNode
     parameters["outputFixedVolumeROI"] = fixedmaskNode
     parameters["outputMovingVolumeROI"] = fixedmaskNode
-    
     
     # Execution
     generalRegistration = slicer.modules.brainsfit
@@ -499,17 +585,17 @@ def regionsMNI(destinyDirectory):
     
     # Fill dataframe
     for index,contact in enumerate(monopolar_markups):
+        
         #  transform ras to mni
         ras = monopolar_RAS[index]
-        # print(ras)
         mni = [0,0,0]
         worldToMniTransform.TransformPoint(ras, mni)
-        # print(mni)
-        # print("\n")
-        # Aseg
+        
+        # Obtain Aseg Labels
         point_ijk = RAStoIJK(ras,asegVolumeNode)
         aseg_label = anatomicREL(asegVoxelArray[point_ijk[2],point_ijk[1],point_ijk[0]])
-        # MNI
+        
+        # Obtain MNI Labels
         point_ijk = RAStoIJK(ras,labelmapVolumeNode)
         mni_label_number = MNIVoxelArray[point_ijk[2],point_ijk[1],point_ijk[0]]
         
@@ -536,17 +622,12 @@ def regionsMNI(destinyDirectory):
         # Fill dataframe
         df = pd.DataFrame([[contact, aseg_label, mni_label, round(mni[0]), round(mni[1]), round(mni[2])]], columns=['Contact', 'Aseg', 'MNI', 'X_mni', 'Y_mni', 'Z_mni'])
         atlas = pd.concat([atlas, df])
-    
-    
 
-    
-    
     # Save the files
     with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
         atlas.to_csv(path_or_buf=destinyDirectory+"/electrodes.csv", index=False, index_label=False)
         print_atlas = atlas.to_string(index=False)
         print(print_atlas)
-    
 
 
 #
@@ -678,16 +759,15 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # (in the selected parameter node).
         self.ui.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         self.ui.fixedVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        # self.ui.outputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        # self.ui.imageThresholdSliderWidget.connect("valueChanged(double)", self.updateParameterNodeFromGUI)
         self.ui.checkBox_bipolar.connect("toggled(bool)", self.updateParameterNodeFromGUI)
-        # self.ui.checkBox_mapping.connect("toggled(bool)", self.updateParameterNodeFromGUI)
-        # self.ui.invertedOutputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         self.ui.DirectoryButton.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
-
+        self.ui.DirectoryButton_subject.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
+        self.ui.SceneName.connect("textChanged(QString)", self.updateParameterNodeFromGUI)
+        
         # Buttons
         self.ui.applyButton.connect('clicked(bool)', self.onApplyButton)
         self.ui.pushButton.connect('clicked(bool)', self.onPushButton)
+        self.ui.saveButton.connect('clicked(bool)', self.onSaveButton)
         
 
         # Make sure parameter node is initialized (needed for module reload)
@@ -779,13 +859,10 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # Update node selectors and sliders
         self.ui.inputSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
         self.ui.fixedVolumeSelector.setCurrentNode(self._parameterNode.GetNodeReference("fixedVolume"))
-        
-        # self.ui.outputSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputVolume"))
-        # self.ui.invertedOutputSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputVolumeInverse"))
-        # self.ui.imageThresholdSliderWidget.value = float(self._parameterNode.GetParameter("Threshold"))
         self.ui.checkBox_bipolar.checked = (self._parameterNode.GetParameter("Bipolar") == "true")
-        # self.ui.checkBox_mapping.checked = (self._parameterNode.GetParameter("Mapping") == "true")
         self.ui.DirectoryButton.directory = str(self._parameterNode.GetParameter("Directory"))
+        self.ui.DirectoryButton_subject.directory = str(self._parameterNode.GetParameter("Directory_Subject"))
+        self.ui.SceneName.text = str(self._parameterNode.GetParameter("SceneName"))
 
         # Update buttons states and tooltips
         if self._parameterNode.GetNodeReference("InputVolume"):
@@ -811,12 +888,10 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self._parameterNode.SetNodeReferenceID("InputVolume", self.ui.inputSelector.currentNodeID)
         self._parameterNode.SetNodeReferenceID("fixedVolume", self.ui.fixedVolumeSelector.currentNodeID)
-        
-        # self._parameterNode.SetNodeReferenceID("OutputVolume", self.ui.outputSelector.currentNodeID)
         self._parameterNode.SetParameter("Directory", str(self.ui.DirectoryButton.directory))
+        self._parameterNode.SetParameter("Directory_Subject", str(self.ui.DirectoryButton_subject.directory))
+        self._parameterNode.SetParameter("SceneName", str(self.ui.SceneName.text))
         self._parameterNode.SetParameter("Bipolar", "true" if self.ui.checkBox_bipolar.checked else "false")
-        # self._parameterNode.SetParameter("Mapping", "true" if self.ui.checkBox_mapping.checked else "false")
-        # self._parameterNode.SetNodeReferenceID("OutputVolumeInverse", self.ui.invertedOutputSelector.currentNodeID)
 
         self._parameterNode.EndModify(wasModified)
 
@@ -834,9 +909,6 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             fixedVolumeNode = self.ui.fixedVolumeSelector.currentNode()
             
             self.logic.process(fidNode,checked_bipolar)
-            # self.logic.regions()
-            
-            # print(self.ui.DirectoryButton.directory)
     
     def onPushButton(self):
         with slicer.util.tryWithErrorDisplay("Failed to compute results.", waitCursor=True):
@@ -846,9 +918,14 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.logic.regions(fixedVolumeNode)
             
             destinyDirectory = self.ui.DirectoryButton.directory
-            print(destinyDirectory)
             self.logic.regions_parttwo(destinyDirectory)
-
+            
+    def onSaveButton(self):
+        
+        destinyDirectory = self.ui.DirectoryButton_subject.directory
+        sceneName = self.ui.SceneName.text
+        print(sceneName)
+        self.logic.save_info(destinyDirectory,sceneName)
 
 
 #
@@ -875,8 +952,6 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         """
         Initialize parameter node with default settings.
         """
-        # if not parameterNode.GetParameter("Threshold"):
-        #     parameterNode.SetParameter("Threshold", "100.0")
         if not parameterNode.GetParameter("Bipolar"):
             parameterNode.SetParameter("Bipolar", "false")
 
@@ -895,7 +970,6 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         startTime = time.time()
         logging.info("Processing electrodes...")
         
-        # registerMNI(fixedVolumeNode)
         findContacts(fidNode,checked_bipolar)
         
         stopTime = time.time()
@@ -905,14 +979,77 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         
         logging.info("Mapping electrodes into the MNI space...")
         registerMNI(fixedVolumeNode)
-        
-        # regionsMNI(destinyDirectory)
     
     def regions_parttwo(self,destinyDirectory):
         
         time.sleep(15)
-        # slicer.util.forceRenderAllViews()
         regionsMNI(destinyDirectory)
+    
+    def save_info(self,destinationDirectory,sceneName):
+        
+        if slicer.util.saveScene(destinationDirectory+"/"+sceneName+".mrml"):
+          logging.info("All files saved to: {0}".format(destinationDirectory))
+          
+          # Save the view from the 3D view
+          viewNodeID = "vtkMRMLViewNode1"
+          import ScreenCapture
+          cap = ScreenCapture.ScreenCaptureLogic()
+          view = cap.viewFromNode(slicer.mrmlScene.GetNodeByID(viewNodeID))
+          view.mrmlViewNode().SetBackgroundColor(1,1,1)
+          view.mrmlViewNode().SetBackgroundColor2(1,1,1)
+          view.mrmlViewNode().SetAxisLabelsVisible(False)
+          view.mrmlViewNode().SetBoxVisible(False)
+          view.resetFocalPoint()
+          cap.captureImageFromView(view, destinationDirectory+"/"+sceneName+".png")
+          
+          # Save all the elements of the scene
+          childIds = vtk.vtkIdList()
+          shNode = slicer.vtkMRMLSubjectHierarchyNode.GetSubjectHierarchyNode(slicer.mrmlScene)
+          shNode.GetItemChildren(shNode.GetSceneItemID(), childIds)
+          
+          os.makedirs(destinationDirectory+"/res/", exist_ok=True)
+          os.makedirs(destinationDirectory+"/notes/", exist_ok=True)
+          
+          for itemIdIndex in range(childIds.GetNumberOfIds()):
+              shItemId = childIds.GetId(itemIdIndex)
+              # Write node to file (if storable)
+              dataNode = shNode.GetItemDataNode(shItemId)
+              if dataNode and dataNode.IsA("vtkMRMLStorableNode") and dataNode.GetStorageNode():
+                  storageNode = dataNode.GetStorageNode()
+                  # filename = os.path.basename(storageNode.GetFileName())
+                  if dataNode.IsA("vtkMRMLScalarVolumeNode") or dataNode.IsA("vtkMRMLLabelMapVolumeNode"):
+                      filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".nrrd"
+                      slicer.util.exportNode(dataNode, filepath)
+                  if dataNode.IsA("vtkMRMLModelNode"):
+                      filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".vtk"
+                      slicer.util.saveNode(dataNode, filepath)
+                  if dataNode.IsA("vtkMRMLMarkupsFiducialNode"):
+                      filepath = destinationDirectory + "/notes/" + dataNode.GetName() + ".fcsv"
+                      slicer.util.saveNode(dataNode, filepath)
+                  if dataNode.IsA("vtkMRMLAnnotationRulerNode"):
+                      filepath = destinationDirectory + "/notes/" + dataNode.GetName() + ".acsv"
+                      slicer.util.saveNode(dataNode, filepath)
+              elif (dataNode and dataNode.IsA("vtkMRMLStorableNode") and not dataNode.GetStorageNode()):
+                  dataNode.AddDefaultStorageNode()
+                  if dataNode.IsA("vtkMRMLScalarVolumeNode") or dataNode.IsA("vtkMRMLLabelMapVolumeNode"):
+                      filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".nrrd"
+                      dataNode.GetStorageNode().SetFileName(filepath) 
+                      slicer.util.exportNode(dataNode, filepath)
+                  # if dataNode.IsA("vtkMRMLModelNode"):
+                  #     filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".vtk"
+                  #     dataNode.GetStorageNode().SetFileName(filepath) 
+                  #     slicer.util.saveNode(dataNode, filepath)
+                  if dataNode.IsA("vtkMRMLMarkupsFiducialNode"):
+                      filepath = destinationDirectory + "/notes/" + dataNode.GetName() + ".fcsv"
+                      dataNode.GetStorageNode().SetFileName(filepath) 
+                      slicer.util.saveNode(dataNode, filepath)
+                  if dataNode.IsA("vtkMRMLAnnotationRulerNode"):
+                      filepath = destinationDirectory + "/notes/" + dataNode.GetName() + ".acsv"
+                      dataNode.GetStorageNode().SetFileName(filepath) 
+                      slicer.util.saveNode(dataNode, filepath)
+              
+        else:
+          logging.error("Files saving failed")
         
 
 #
