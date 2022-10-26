@@ -1008,7 +1008,7 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
           shNode.GetItemChildren(shNode.GetSceneItemID(), childIds)
           
           os.makedirs(destinationDirectory+"/res/", exist_ok=True)
-          os.makedirs(destinationDirectory+"/notes/", exist_ok=True)
+          os.makedirs(destinationDirectory+"/note/", exist_ok=True)
           
           for itemIdIndex in range(childIds.GetNumberOfIds()):
               shItemId = childIds.GetId(itemIdIndex)
@@ -1024,10 +1024,10 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
                       filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".vtk"
                       slicer.util.saveNode(dataNode, filepath)
                   if dataNode.IsA("vtkMRMLMarkupsFiducialNode"):
-                      filepath = destinationDirectory + "/notes/" + dataNode.GetName() + ".fcsv"
+                      filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".fcsv"
                       slicer.util.saveNode(dataNode, filepath)
                   if dataNode.IsA("vtkMRMLAnnotationRulerNode"):
-                      filepath = destinationDirectory + "/notes/" + dataNode.GetName() + ".acsv"
+                      filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".acsv"
                       slicer.util.saveNode(dataNode, filepath)
               elif (dataNode and dataNode.IsA("vtkMRMLStorableNode") and not dataNode.GetStorageNode()):
                   dataNode.AddDefaultStorageNode()
@@ -1040,11 +1040,11 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
                   #     dataNode.GetStorageNode().SetFileName(filepath) 
                   #     slicer.util.saveNode(dataNode, filepath)
                   if dataNode.IsA("vtkMRMLMarkupsFiducialNode"):
-                      filepath = destinationDirectory + "/notes/" + dataNode.GetName() + ".fcsv"
+                      filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".fcsv"
                       dataNode.GetStorageNode().SetFileName(filepath) 
                       slicer.util.saveNode(dataNode, filepath)
                   if dataNode.IsA("vtkMRMLAnnotationRulerNode"):
-                      filepath = destinationDirectory + "/notes/" + dataNode.GetName() + ".acsv"
+                      filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".acsv"
                       dataNode.GetStorageNode().SetFileName(filepath) 
                       slicer.util.saveNode(dataNode, filepath)
               

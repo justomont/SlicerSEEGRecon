@@ -147,6 +147,16 @@
       <string>Saving subject</string>
      </property>
      <layout class="QFormLayout" name="formLayout_4">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_5">
+        <property name="text">
+         <string>Scene name:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLineEdit" name="SceneName"/>
+      </item>
       <item row="1" column="0">
        <widget class="QLabel" name="label_4">
         <property name="text">
@@ -170,16 +180,6 @@
          <string>Save files</string>
         </property>
        </widget>
-      </item>
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_5">
-        <property name="text">
-         <string>Scene name:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QLineEdit" name="SceneName"/>
       </item>
      </layout>
     </widget>
@@ -236,8 +236,8 @@
      <y>132</y>
     </hint>
     <hint type="destinationlabel">
-     <x>248</x>
-     <y>61</y>
+     <x>364</x>
+     <y>57</y>
     </hint>
    </hints>
   </connection>
@@ -252,8 +252,8 @@
      <y>135</y>
     </hint>
     <hint type="destinationlabel">
-     <x>220</x>
-     <y>161</y>
+     <x>344</x>
+     <y>202</y>
     </hint>
    </hints>
   </connection>
