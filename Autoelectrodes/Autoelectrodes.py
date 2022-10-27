@@ -408,21 +408,21 @@ def findContacts(fidNode,checked_bipolar):
         fidNodeE.GetDisplayNode().SetColor([170/255,0/255,0/255])
     
     # Gliph type
-    fidNode.GetDisplayNode().SetGlyphType(6)
+    fidNode.GetDisplayNode().SetGlyphType(8)
     fidNode.GetDisplayNode().SetGlyphScale(5)
     fidNode.GetDisplayNode().SetTextScale(4)
     
-    fidNodeWM.GetDisplayNode().SetGlyphType(6)
+    fidNodeWM.GetDisplayNode().SetGlyphType(8)
     fidNodeWM.GetDisplayNode().SetGlyphScale(5)
     fidNodeWM.GetDisplayNode().SetTextScale(4)
     fidNodeWM.GetDisplayNode().SetVisibility(False)
     
-    fidNodeP.GetDisplayNode().SetGlyphType(6)
+    fidNodeP.GetDisplayNode().SetGlyphType(8)
     fidNodeP.GetDisplayNode().SetGlyphScale(5)
     fidNodeP.GetDisplayNode().SetTextScale(4)
     fidNodeWM.GetDisplayNode().SetVisibility(False)
     
-    fidNodeE.GetDisplayNode().SetGlyphType(6)
+    fidNodeE.GetDisplayNode().SetGlyphType(8)
     fidNodeE.GetDisplayNode().SetGlyphScale(5)
     fidNodeE.GetDisplayNode().SetTextScale(4)
     fidNodeWM.GetDisplayNode().SetVisibility(False)
@@ -497,15 +497,15 @@ def findContacts(fidNode,checked_bipolar):
             fidNodeBi_P.GetDisplayNode().SetColor([170/255,0/255,0/255])
         
         # Gliph type
-        fidNodeBi.GetDisplayNode().SetGlyphType(6)
+        fidNodeBi.GetDisplayNode().SetGlyphType(8)
         fidNodeBi.GetDisplayNode().SetGlyphScale(5)
         fidNodeBi.GetDisplayNode().SetTextScale(4)
         
-        fidNodeBi_WM.GetDisplayNode().SetGlyphType(6)
+        fidNodeBi_WM.GetDisplayNode().SetGlyphType(8)
         fidNodeBi_WM.GetDisplayNode().SetGlyphScale(5)
         fidNodeBi_WM.GetDisplayNode().SetTextScale(4)
         
-        fidNodeBi_P.GetDisplayNode().SetGlyphType(6)
+        fidNodeBi_P.GetDisplayNode().SetGlyphType(8)
         fidNodeBi_P.GetDisplayNode().SetGlyphScale(5)
         fidNodeBi_P.GetDisplayNode().SetTextScale(4)
         
@@ -521,7 +521,7 @@ def registerMNI(fixedVolumeNode):
     movingmaskPath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a_mask.nii') # moving volume mask
     
     # Set parameters
-    movingVolumeNode = slicer.util.loadVolume(templatePath,properties={"name":"ICBM152_T1","center":True})
+    movingVolumeNode = slicer.util.loadVolume(templatePath,properties={"name":"ICBM152_T1","center":False})
     
     linearTransformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
     linearTransformNode.SetName("Transform2MNI")
@@ -531,7 +531,7 @@ def registerMNI(fixedVolumeNode):
     aseg = slicer.util.getFirstNodeByName("aseg")
     fixedmaskNode = slicer.mrmlScene.CopyNode(aseg)
     fixedmaskNode.SetName("aseg_mask")
-    movingmaskNode = slicer.util.loadVolume(movingmaskPath,properties={"name":"MNI_mask","labelmap":True,"center":True})
+    movingmaskNode = slicer.util.loadVolume(movingmaskPath,properties={"name":"MNI_mask","labelmap":True,"center":False})
     
     parameters = {}
     parameters["fixedVolume"] = fixedVolumeNode
@@ -565,9 +565,12 @@ def regionsMNI(destinyDirectory):
     transform = linearTransformNode
     
     # Transform the labelmap to match the patient volume
-    labelmapVolumeNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_labels","labelmap":True,"center":True})
+    labelmapVolumeNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_labels","labelmap":True,"center":False})
     labelmapVolumeNode.SetName("transformed_MNI_labels")
     labelmapVolumeNode.ApplyTransformMatrix(transform.GetMatrixTransformToParent())
+    time.sleep(15)
+    
+    labelmapVolumeNode = slicer.util.getFirstNodeByName("transformed_MNI_labels")
     
     # Obtain voxel array of the label map to obtain the number associated to a specific location
     MNIVoxelArray = slicer.util.arrayFromVolume(labelmapVolumeNode)
@@ -990,6 +993,9 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         if slicer.util.saveScene(destinationDirectory+"/"+sceneName+".mrml"):
           logging.info("All files saved to: {0}".format(destinationDirectory))
           
+          os.makedirs(destinationDirectory+"/res/", exist_ok=True)
+          os.makedirs(destinationDirectory+"/note/", exist_ok=True)
+          
           # Save the view from the 3D view
           viewNodeID = "vtkMRMLViewNode1"
           import ScreenCapture
@@ -1005,29 +1011,30 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
           # Save all the elements of the scene
           childIds = vtk.vtkIdList()
           shNode = slicer.vtkMRMLSubjectHierarchyNode.GetSubjectHierarchyNode(slicer.mrmlScene)
-          shNode.GetItemChildren(shNode.GetSceneItemID(), childIds)
-          
-          os.makedirs(destinationDirectory+"/res/", exist_ok=True)
-          os.makedirs(destinationDirectory+"/note/", exist_ok=True)
+          shNode.GetItemChildren(shNode.GetSceneItemID(), childIds) 
           
           for itemIdIndex in range(childIds.GetNumberOfIds()):
               shItemId = childIds.GetId(itemIdIndex)
               # Write node to file (if storable)
               dataNode = shNode.GetItemDataNode(shItemId)
               if dataNode and dataNode.IsA("vtkMRMLStorableNode") and dataNode.GetStorageNode():
-                  storageNode = dataNode.GetStorageNode()
+                  # storageNode = dataNode.GetStorageNode()
                   # filename = os.path.basename(storageNode.GetFileName())
                   if dataNode.IsA("vtkMRMLScalarVolumeNode") or dataNode.IsA("vtkMRMLLabelMapVolumeNode"):
                       filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".nrrd"
+                      dataNode.GetStorageNode().SetFileName(filepath)
                       slicer.util.exportNode(dataNode, filepath)
                   if dataNode.IsA("vtkMRMLModelNode"):
                       filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".vtk"
+                      dataNode.GetStorageNode().SetFileName(filepath)
                       slicer.util.saveNode(dataNode, filepath)
                   if dataNode.IsA("vtkMRMLMarkupsFiducialNode"):
                       filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".fcsv"
+                      dataNode.GetStorageNode().SetFileName(filepath)
                       slicer.util.saveNode(dataNode, filepath)
                   if dataNode.IsA("vtkMRMLAnnotationRulerNode"):
                       filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".acsv"
+                      dataNode.GetStorageNode().SetFileName(filepath)
                       slicer.util.saveNode(dataNode, filepath)
               elif (dataNode and dataNode.IsA("vtkMRMLStorableNode") and not dataNode.GetStorageNode()):
                   dataNode.AddDefaultStorageNode()
@@ -1046,8 +1053,10 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
                   if dataNode.IsA("vtkMRMLAnnotationRulerNode"):
                       filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".acsv"
                       dataNode.GetStorageNode().SetFileName(filepath) 
-                      slicer.util.saveNode(dataNode, filepath)
-              
+                      slicer.util.saveNode(dataNode, filepath)     
+          
+          slicer.util.saveScene(destinationDirectory+"/"+sceneName+".mrml")
+            
         else:
           logging.error("Files saving failed")
         
