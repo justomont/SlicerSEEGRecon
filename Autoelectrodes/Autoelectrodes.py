@@ -585,14 +585,14 @@ def regionsMNI(destinyDirectory):
     labelmapPath = os.path.join(mniPath, 'mni_icbm152_CerebrA_tal_nlin_sym_09c.nii') # labelmap
     
     # Select the transform from the MNI to patient registration 
-    transform = linearTransformNode
+    transform = slicer.util.getFirstNodeByName("Transform2MNI")
     
     # Transform the labelmap to match the patient volume
     labelmapVolumeNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_labels","labelmap":True,"center":False})
     labelmapVolumeNode.SetName("transformed_MNI_labels")
     # labelmapVolumeNode.ApplyTransformMatrix(transform.GetMatrixTransformToParent())
     labelmapVolumeNode.SetAndObserveTransformNodeID(transform.GetID())
-    time.sleep(15)
+    # time.sleep(15)
     slicer.util.forceRenderAllViews()
     
     labelmapVolumeNode = slicer.util.getFirstNodeByName("transformed_MNI_labels")
@@ -609,7 +609,7 @@ def regionsMNI(destinyDirectory):
     
     # Inverse transform to compute the MNI coordinates of each contact
     worldToMniTransform = vtk.vtkGeneralTransform()
-    transform.GetTransformToWorld(worldToMniTransform)
+    transform.GetTransformFromWorld(worldToMniTransform)
     
     # Fill dataframe
     for index,contact in enumerate(monopolar_markups):
@@ -652,6 +652,7 @@ def regionsMNI(destinyDirectory):
         print(mni)
         print(point_ijk)
         print(mni_label_number)
+        print(mni_label)
         
         
         # Fill dataframe
@@ -1020,7 +1021,7 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
     
     def regions_parttwo(self,destinyDirectory):
         
-        time.sleep(15)
+        # time.sleep(15)
         regionsMNI(destinyDirectory)
     
     def save_info(self,destinationDirectory,sceneName):
