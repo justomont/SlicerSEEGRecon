@@ -592,8 +592,9 @@ def regionsMNI(destinyDirectory):
     labelmapVolumeNode.SetName("transformed_MNI_labels")
     # labelmapVolumeNode.ApplyTransformMatrix(transform.GetMatrixTransformToParent())
     labelmapVolumeNode.SetAndObserveTransformNodeID(transform.GetID())
-    # time.sleep(15)
+    time.sleep(15)
     slicer.util.forceRenderAllViews()
+    time.sleep(5)
     
     labelmapVolumeNode = slicer.util.getFirstNodeByName("transformed_MNI_labels")
     
@@ -647,12 +648,12 @@ def regionsMNI(destinyDirectory):
         else:
             mni_label = "unknown"
         
-        print(contact)
-        print(ras)
-        print(mni)
-        print(point_ijk)
-        print(mni_label_number)
-        print(mni_label)
+        # print(contact)
+        # print(ras)
+        # print(mni)
+        # print(point_ijk)
+        # print(mni_label_number)
+        # print(mni_label)
         
         
         # Fill dataframe
