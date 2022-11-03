@@ -187,19 +187,19 @@ def findContacts(fidNode,checked_bipolar):
     monopolar_markups_WM = []
     monopolar_RAS_WM = []
     fidNodeWM = slicer.vtkMRMLMarkupsFiducialNode()
-    fidNodeWM.SetName("mono-WM")
+    fidNodeWM.SetName(fidNode.GetName()+"-WM")
     slicer.mrmlScene.AddNode(fidNodeWM)
     
     monopolar_markups_P = []
     monopolar_RAS_P = []
     fidNodeP = slicer.vtkMRMLMarkupsFiducialNode()
-    fidNodeP.SetName("mono-P")
+    fidNodeP.SetName(fidNode.GetName()+"-P")
     slicer.mrmlScene.AddNode(fidNodeP)
     
     monopolar_markups_E = []
     monopolar_RAS_E = []
     fidNodeE = slicer.vtkMRMLMarkupsFiducialNode()
-    fidNodeE.SetName("mono-ends")
+    fidNodeE.SetName(fidNode.GetName()+"-ends")
     slicer.mrmlScene.AddNode(fidNodeE)
     
     # Iterate over all the markups defined by the user
@@ -275,7 +275,7 @@ def findContacts(fidNode,checked_bipolar):
                 if rulerName not in ruler_done_names: 
                     ruler_done_names.append(rulerName)
                 else:
-                    print("else")
+                    # print("else")
                     i=0
                     while rulerName in ruler_done_names:
                         i +=1
@@ -321,7 +321,7 @@ def findContacts(fidNode,checked_bipolar):
                 if rulerName not in ruler_done_names: 
                     ruler_done_names.append(rulerName)
                 else:
-                    print("else")
+                    # print("else")
                     i=0
                     while rulerName in ruler_done_names:
                         i +=1
@@ -365,7 +365,7 @@ def findContacts(fidNode,checked_bipolar):
             if rulerName not in ruler_done_names: 
                 ruler_done_names.append(rulerName)
             else:
-                print("else")
+                # print("else")
                 i=0
                 while rulerName in ruler_done_names:
                     i +=1
@@ -388,19 +388,28 @@ def findContacts(fidNode,checked_bipolar):
     # Lock all markups
     for markupN in range(fidNode.GetNumberOfMarkups()):
         fidNode.SetNthFiducialLocked(markupN,True)
+        fidNode.SetNthControlPointSelected(markupN,1)
     for markupN in range(fidNodeWM.GetNumberOfMarkups()):
         fidNodeWM.SetNthFiducialLocked(markupN,True)
+        fidNodeWM.SetNthControlPointSelected(markupN,1)
     for markupN in range(fidNodeP.GetNumberOfMarkups()):
         fidNodeP.SetNthFiducialLocked(markupN,True)
+        fidNodeP.SetNthControlPointSelected(markupN,1)
     for markupN in range(fidNodeE.GetNumberOfMarkups()):
         fidNodeE.SetNthFiducialLocked(markupN,True)
+        fidNodeE.SetNthControlPointSelected(markupN,1)
     
     if P[0] > 0:
-        # Color
-        fidNode.GetDisplayNode().SetColor([0/255,85/255,225/255])
-        fidNodeWM.GetDisplayNode().SetColor([0/255,85/255,225/255])
-        fidNodeP.GetDisplayNode().SetColor([0/255,85/255,225/255])
-        fidNodeE.GetDisplayNode().SetColor([0/255,85/255,225/255])
+        # SELECTED Color for the right hemisphere
+        fidNode.GetDisplayNode().SetSelectedColor([0/255,85/255,225/255])
+        fidNodeWM.GetDisplayNode().SetSelectedColor([0/255,85/255,225/255])
+        fidNodeP.GetDisplayNode().SetSelectedColor([0/255,85/255,225/255])
+        fidNodeE.GetDisplayNode().SetSelectedColor([0/255,85/255,225/255])
+        # UNselected Color for the right hemisphere
+        fidNode.GetDisplayNode().SetColor([0/255,0/255,225/255])
+        fidNodeWM.GetDisplayNode().SetColor([0/255,0/255,225/255])
+        fidNodeP.GetDisplayNode().SetColor([0/255,0/255,225/255])
+        fidNodeE.GetDisplayNode().SetColor([0/255,0/255,225/255])
     else:
         fidNode.GetDisplayNode().SetColor([170/255,0/255,0/255])
         fidNodeWM.GetDisplayNode().SetColor([170/255,0/255,0/255])
@@ -410,21 +419,21 @@ def findContacts(fidNode,checked_bipolar):
     # Gliph type
     fidNode.GetDisplayNode().SetGlyphType(8)
     fidNode.GetDisplayNode().SetGlyphScale(5)
-    fidNode.GetDisplayNode().SetTextScale(4)
+    fidNode.GetDisplayNode().SetTextScale(0)
     
     fidNodeWM.GetDisplayNode().SetGlyphType(8)
-    fidNodeWM.GetDisplayNode().SetGlyphScale(5)
-    fidNodeWM.GetDisplayNode().SetTextScale(4)
+    fidNodeWM.GetDisplayNode().SetGlyphScale(3)
+    fidNodeWM.GetDisplayNode().SetTextScale(0)
     fidNodeWM.GetDisplayNode().SetVisibility(False)
     
     fidNodeP.GetDisplayNode().SetGlyphType(8)
-    fidNodeP.GetDisplayNode().SetGlyphScale(5)
-    fidNodeP.GetDisplayNode().SetTextScale(4)
+    fidNodeP.GetDisplayNode().SetGlyphScale(3)
+    fidNodeP.GetDisplayNode().SetTextScale(0)
     fidNodeWM.GetDisplayNode().SetVisibility(False)
     
     fidNodeE.GetDisplayNode().SetGlyphType(8)
-    fidNodeE.GetDisplayNode().SetGlyphScale(5)
-    fidNodeE.GetDisplayNode().SetTextScale(4)
+    fidNodeE.GetDisplayNode().SetGlyphScale(3)
+    fidNodeE.GetDisplayNode().SetTextScale(0)
     fidNodeWM.GetDisplayNode().SetVisibility(False)
     
     fidNode.GetDisplayNode().SetVisibility(True)
@@ -435,19 +444,19 @@ def findContacts(fidNode,checked_bipolar):
     if checked_bipolar:
         # Bipolar 
         fidNodeBi = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNodeBi.SetName("Bipolar")
+        fidNodeBi.SetName("Bipolar-"+fidNode.GetName())
         slicer.mrmlScene.AddNode(fidNodeBi)
         bipolar_markups = []
         bipolar_RAS = []
         
         fidNodeBi_WM = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNodeBi_WM.SetName("Bi-WM")
+        fidNodeBi_WM.SetName("Bipolar-"+fidNode.GetName()+"-WM")
         slicer.mrmlScene.AddNode(fidNodeBi_WM)
         bipolar_markups_WM = []
         bipolar_RAS_WM = []
         
         fidNodeBi_P = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNodeBi_P.SetName("Bi-P")
+        fidNodeBi_P.SetName("Bipolar-"+fidNode.GetName()+"-P")
         slicer.mrmlScene.AddNode(fidNodeBi_P)
         bipolar_markups_P = []
         bipolar_RAS_P = []
@@ -482,32 +491,46 @@ def findContacts(fidNode,checked_bipolar):
         # Lock all markups
         for markupN in range(fidNodeBi.GetNumberOfMarkups()):
             fidNodeBi.SetNthFiducialLocked(markupN,True)
+            fidNodeBi.SetNthControlPointSelected(markupN,0)
         for markupN in range(fidNodeBi_WM.GetNumberOfMarkups()):
             fidNodeBi_WM.SetNthFiducialLocked(markupN,True)
+            fidNodeBi_WM.SetNthControlPointSelected(markupN,0)
         for markupN in range(fidNodeBi_P.GetNumberOfMarkups()):
             fidNodeBi_P.SetNthFiducialLocked(markupN,True)
+            fidNodeBi_P.SetNthControlPointSelected(markupN,0)
         
         if P[0] > 0:
-            fidNodeBi.GetDisplayNode().SetColor([0/255,85/255,225/255])
-            fidNodeBi_WM.GetDisplayNode().SetColor([0/255,85/255,225/255])
-            fidNodeBi_P.GetDisplayNode().SetColor([0/255,85/255,225/255])
+            # SELECTED color for the right hemisphere
+            fidNodeBi.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+            fidNodeBi_WM.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+            fidNodeBi_P.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+            # UNselected
+            fidNodeBi.GetDisplayNode().SetColor([0/255,0/255,0/255])
+            fidNodeBi_WM.GetDisplayNode().SetColor([0/255,0/255,0/255])
+            fidNodeBi_P.GetDisplayNode().SetColor([0/255,0/255,0/255])
+            
         else:
-            fidNodeBi.GetDisplayNode().SetColor([170/255,0/255,0/255])
-            fidNodeBi_WM.GetDisplayNode().SetColor([170/255,0/255,0/255])
-            fidNodeBi_P.GetDisplayNode().SetColor([170/255,0/255,0/255])
+            # Selected
+            fidNodeBi.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+            fidNodeBi_WM.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+            fidNodeBi_P.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+            # Unselected
+            fidNodeBi.GetDisplayNode().SetColor([0/255,0/255,0/255])
+            fidNodeBi_WM.GetDisplayNode().SetColor([0/255,0/255,0/255])
+            fidNodeBi_P.GetDisplayNode().SetColor([0/255,0/255,0/255])
         
         # Gliph type
         fidNodeBi.GetDisplayNode().SetGlyphType(8)
-        fidNodeBi.GetDisplayNode().SetGlyphScale(5)
-        fidNodeBi.GetDisplayNode().SetTextScale(4)
+        fidNodeBi.GetDisplayNode().SetGlyphScale(3)
+        fidNodeBi.GetDisplayNode().SetTextScale(0)
         
         fidNodeBi_WM.GetDisplayNode().SetGlyphType(8)
-        fidNodeBi_WM.GetDisplayNode().SetGlyphScale(5)
-        fidNodeBi_WM.GetDisplayNode().SetTextScale(4)
+        fidNodeBi_WM.GetDisplayNode().SetGlyphScale(3)
+        fidNodeBi_WM.GetDisplayNode().SetTextScale(0)
         
         fidNodeBi_P.GetDisplayNode().SetGlyphType(8)
-        fidNodeBi_P.GetDisplayNode().SetGlyphScale(5)
-        fidNodeBi_P.GetDisplayNode().SetTextScale(4)
+        fidNodeBi_P.GetDisplayNode().SetGlyphScale(3)
+        fidNodeBi_P.GetDisplayNode().SetTextScale(0)
         
         logging.info("Bipolar contact placement complete.\n") 
         
@@ -517,8 +540,8 @@ def registerMNI(fixedVolumeNode):
     # ICBM152  
     # Paths
     mniPath = os.path.join(os.path.dirname(__file__), 'Resources/MNI')
-    templatePath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a.nii') # moving volume
-    movingmaskPath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a_mask.nii') # moving volume mask
+    templatePath = os.path.join(mniPath, 'icbm_avg_152_t1_tal_lin.nii') # moving volume
+    movingmaskPath = os.path.join(mniPath, 'icbm_avg_152_t1_tal_lin_mask.nii') # moving volume mask
     
     # Set parameters
     movingVolumeNode = slicer.util.loadVolume(templatePath,properties={"name":"ICBM152_T1","center":False})
@@ -536,7 +559,7 @@ def registerMNI(fixedVolumeNode):
     parameters = {}
     parameters["fixedVolume"] = fixedVolumeNode
     parameters["movingVolume"] = movingVolumeNode
-    parameters["samplingPercentage"] = 0.005  
+    parameters["samplingPercentage"] = 0.02
     parameters["linearTransform"] = linearTransformNode
     parameters["outputVolume"] = outputVolumeNode
     parameters["initializeTransformMode"] = "useCenterOfHeadAlign"
@@ -567,8 +590,10 @@ def regionsMNI(destinyDirectory):
     # Transform the labelmap to match the patient volume
     labelmapVolumeNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_labels","labelmap":True,"center":False})
     labelmapVolumeNode.SetName("transformed_MNI_labels")
-    labelmapVolumeNode.ApplyTransformMatrix(transform.GetMatrixTransformToParent())
+    # labelmapVolumeNode.ApplyTransformMatrix(transform.GetMatrixTransformToParent())
+    labelmapVolumeNode.SetAndObserveTransformNodeID(transform.GetID())
     time.sleep(15)
+    slicer.util.forceRenderAllViews()
     
     labelmapVolumeNode = slicer.util.getFirstNodeByName("transformed_MNI_labels")
     
@@ -621,7 +646,14 @@ def regionsMNI(destinyDirectory):
             mni_label = MNI_details[MNI_details.eq(mni_label_number).any(axis="columns")]["Label Name"].iloc[0]
         else:
             mni_label = "unknown"
-
+        
+        print(contact)
+        print(ras)
+        print(mni)
+        print(point_ijk)
+        print(mni_label_number)
+        
+        
         # Fill dataframe
         df = pd.DataFrame([[contact, aseg_label, mni_label, round(mni[0]), round(mni[1]), round(mni[2])]], columns=['Contact', 'Aseg', 'MNI', 'X_mni', 'Y_mni', 'Z_mni'])
         atlas = pd.concat([atlas, df])
@@ -632,6 +664,9 @@ def regionsMNI(destinyDirectory):
         print_atlas = atlas.to_string(index=False)
         print(print_atlas)
 
+def regionsMNInibabel(fixedVolumeNode):
+    
+    brain_img_data = arrayFromVolume(fixedVolumeNode)
 
 #
 # Autoelectrodes
@@ -927,7 +962,7 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         
         destinyDirectory = self.ui.DirectoryButton_subject.directory
         sceneName = self.ui.SceneName.text
-        print(sceneName)
+        # print(sceneName)
         self.logic.save_info(destinyDirectory,sceneName)
 
 
