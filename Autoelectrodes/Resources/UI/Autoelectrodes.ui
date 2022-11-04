@@ -124,7 +124,7 @@
       <item row="2" column="1">
        <widget class="QPushButton" name="pushButton">
         <property name="text">
-         <string>Generate table</string>
+         <string>Register</string>
         </property>
        </widget>
       </item>
@@ -135,6 +135,13 @@
        <widget class="QLabel" name="label_4">
         <property name="text">
          <string>Destination folder:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="QPushButton" name="pushButton_mapping">
+        <property name="text">
+         <string>Map electrodes</string>
         </property>
        </widget>
       </item>

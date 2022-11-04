@@ -596,6 +596,11 @@ def regionsMNI(destinyDirectory):
     slicer.util.forceRenderAllViews()
     time.sleep(5)
     
+def regionsMNI_2(destinyDirectory):  
+    
+    # Select the transform from the MNI to patient registration 
+    transform = slicer.util.getFirstNodeByName("Transform2MNI")
+    
     labelmapVolumeNode = slicer.util.getFirstNodeByName("transformed_MNI_labels")
     
     # Obtain voxel array of the label map to obtain the number associated to a specific location
@@ -807,6 +812,7 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # Buttons
         self.ui.applyButton.connect('clicked(bool)', self.onApplyButton)
         self.ui.pushButton.connect('clicked(bool)', self.onPushButton)
+        self.ui.pushButton_mapping.connect('clicked(bool)', self.onPushButton_mapping)
         self.ui.saveButton.connect('clicked(bool)', self.onSaveButton)
         
 
@@ -960,6 +966,13 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             destinyDirectory = self.ui.DirectoryButton.directory
             self.logic.regions_parttwo(destinyDirectory)
             
+    
+    def onPushButton_mapping(self):
+        
+        destinyDirectory = self.ui.DirectoryButton.directory
+        self.logic.regions_partthree(destinyDirectory)
+        
+            
     def onSaveButton(self):
         
         destinyDirectory = self.ui.DirectoryButton_subject.directory
@@ -1024,6 +1037,9 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         
         # time.sleep(15)
         regionsMNI(destinyDirectory)
+        
+    def regions_partthree(self,destinyDirectory):
+        regionsMNI_2(destinyDirectory)
     
     def save_info(self,destinationDirectory,sceneName):
         
