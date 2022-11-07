@@ -165,7 +165,7 @@ def findContacts(fidNode,checked_bipolar):
     markups = ["{}{:0>2.0f}".format(''.join([i for i in markup if not i.isdigit()]),int(re.search(r'\d+', markup).group()))  for markup in mu]
     markups = zip(*sorted(zip(markups,RAS), key=lambda item: (int(item.partition(' ')[0]) if item[0].isdigit() else float('inf'), item)))
     markups, RAS = [list(tuple) for tuple in  markups]
-
+    # print(markups)
     
     # Store also the location of the end of the electrodes just for representational purposes
     end_boolean = [not element for element in boolean]
@@ -225,11 +225,11 @@ def findContacts(fidNode,checked_bipolar):
                     if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
                         monopolar_markups_WM.append(markup)
                         monopolar_RAS_WM.append(RAS[index])
-                        fidNodeWM.AddFiducialFromArray(RAS[index], markup)
+                        fidNodeWM.AddFiducialFromArray(RAS[index], letter+str(digit))
                     else:
                         monopolar_markups_P.append(markup)
                         monopolar_RAS_P.append(RAS[index])
-                        fidNodeP.AddFiducialFromArray(RAS[index], markup)
+                        fidNodeP.AddFiducialFromArray(RAS[index], letter+str(digit))
                 # calculate how many markups should be added until the next user-defined markup
                 additions = next_digit - digit-1
                 # calculate how distant the markups should be
@@ -471,7 +471,7 @@ def findContacts(fidNode,checked_bipolar):
                 
                 if letter == next_letter:
                     middle_point = np.add(monopolar_RAS[index+1], monopolar_RAS[index])/2
-                    bi_tag = "-".join([markup,monopolar_markups[index+1]])
+                    bi_tag = "-".join([letter+str(digit),monopolar_markups[index+1]])
                     bipolar_markups.append(bi_tag)
                     bipolar_RAS.append(middle_point)
                     
@@ -965,7 +965,6 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             
             destinyDirectory = self.ui.DirectoryButton.directory
             self.logic.regions_parttwo(destinyDirectory)
-            
     
     def onPushButton_mapping(self):
         
@@ -1048,6 +1047,7 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
           
           os.makedirs(destinationDirectory+"/res/", exist_ok=True)
           os.makedirs(destinationDirectory+"/note/", exist_ok=True)
+          os.makedirs(destinationDirectory+"/edit/", exist_ok=True)
           
           # Save the view from the 3D view
           viewNodeID = "vtkMRMLViewNode1"
@@ -1107,6 +1107,10 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
                       filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".acsv"
                       dataNode.GetStorageNode().SetFileName(filepath) 
                       slicer.util.saveNode(dataNode, filepath)     
+                    # if dataNode.IsA("vtkMRMLLinearTransformNode"):
+                    #     filepath = destinationDirectory + "/edit/" + dataNode.GetName() + ".h5"
+                    #     dataNode.GetStorageNode().SetFileName(filepath) 
+                    #     slicer.util.saveNode(dataNode, filepath)    
           
           slicer.util.saveScene(destinationDirectory+"/"+sceneName+".mrml")
             
