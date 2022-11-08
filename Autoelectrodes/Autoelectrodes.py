@@ -1095,10 +1095,10 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
                       filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".nrrd"
                       dataNode.GetStorageNode().SetFileName(filepath) 
                       slicer.util.exportNode(dataNode, filepath)
-                  # if dataNode.IsA("vtkMRMLModelNode"):
-                  #     filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".vtk"
-                  #     dataNode.GetStorageNode().SetFileName(filepath) 
-                  #     slicer.util.saveNode(dataNode, filepath)
+                  if dataNode.IsA("vtkMRMLModelNode"):
+                      filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".vtk"
+                      dataNode.GetStorageNode().SetFileName(filepath) 
+                      slicer.util.saveNode(dataNode, filepath)
                   if dataNode.IsA("vtkMRMLMarkupsFiducialNode"):
                       filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".fcsv"
                       dataNode.GetStorageNode().SetFileName(filepath) 
