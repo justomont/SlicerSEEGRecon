@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>377</width>
+    <width>555</width>
     <height>571</height>
    </rect>
   </property>
@@ -29,6 +29,9 @@
       </item>
       <item row="0" column="1">
        <widget class="qMRMLNodeComboBox" name="inputSelector">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
         <property name="toolTip">
          <string>Pick the list to generate the electrodes.</string>
         </property>
@@ -149,6 +152,130 @@
     </widget>
    </item>
    <item>
+    <widget class="ctkCollapsibleButton" name="copytransferCollapsibleButton">
+     <property name="enabled">
+      <bool>true</bool>
+     </property>
+     <property name="font">
+      <font>
+       <weight>50</weight>
+       <bold>false</bold>
+       <kerning>true</kerning>
+      </font>
+     </property>
+     <property name="text">
+      <string>Copy/Transfer electrodes</string>
+     </property>
+     <property name="checkable">
+      <bool>true</bool>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+     <layout class="QFormLayout" name="formLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_inputlist">
+        <property name="text">
+         <string>Input list:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="qMRMLNodeComboBox" name="inputListSelector">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="font">
+         <font>
+          <weight>50</weight>
+          <bold>false</bold>
+          <kerning>true</kerning>
+         </font>
+        </property>
+        <property name="nodeTypes">
+         <stringlist>
+          <string>vtkMRMLMarkupsFiducialNode</string>
+         </stringlist>
+        </property>
+        <property name="noneEnabled">
+         <bool>false</bool>
+        </property>
+        <property name="removeEnabled">
+         <bool>false</bool>
+        </property>
+        <property name="editEnabled">
+         <bool>false</bool>
+        </property>
+        <property name="renameEnabled">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0">
+       <widget class="QLabel" name="label_6">
+        <property name="text">
+         <string>Output list: </string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="1">
+       <widget class="qMRMLNodeComboBox" name="outputListSelector">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="toolTip">
+         <string/>
+        </property>
+        <property name="nodeTypes">
+         <stringlist>
+          <string>vtkMRMLMarkupsFiducialNode</string>
+         </stringlist>
+        </property>
+        <property name="showChildNodeTypes">
+         <bool>false</bool>
+        </property>
+        <property name="noneEnabled">
+         <bool>false</bool>
+        </property>
+        <property name="addEnabled">
+         <bool>true</bool>
+        </property>
+        <property name="removeEnabled">
+         <bool>false</bool>
+        </property>
+        <property name="editEnabled">
+         <bool>false</bool>
+        </property>
+        <property name="renameEnabled">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="9" column="1">
+       <widget class="QCheckBox" name="checkBox_transfer">
+        <property name="text">
+         <string>Transfer</string>
+        </property>
+       </widget>
+      </item>
+      <item row="10" column="0">
+       <widget class="QLabel" name="label_7">
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+      <item row="10" column="1">
+       <widget class="QPushButton" name="copyButton">
+        <property name="text">
+         <string>Copy</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
     <widget class="ctkCollapsibleButton" name="outputsCollapsibleButton_2">
      <property name="text">
       <string>Saving subject</string>
@@ -259,8 +386,40 @@
      <y>135</y>
     </hint>
     <hint type="destinationlabel">
-     <x>344</x>
-     <y>202</y>
+     <x>366</x>
+     <y>171</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>extension_test</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>outputListSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>249</x>
+     <y>285</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>371</x>
+     <y>355</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>extension_test</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>inputListSelector</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>249</x>
+     <y>285</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>371</x>
+     <y>319</y>
     </hint>
    </hints>
   </connection>

@@ -805,6 +805,9 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         self.ui.fixedVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         self.ui.checkBox_bipolar.connect("toggled(bool)", self.updateParameterNodeFromGUI)
+        self.ui.inputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.outputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.checkBox_transfer.connect("toggled(bool)", self.updateParameterNodeFromGUI)
         self.ui.DirectoryButton.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
         self.ui.DirectoryButton_subject.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
         self.ui.SceneName.connect("textChanged(QString)", self.updateParameterNodeFromGUI)
@@ -812,6 +815,7 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # Buttons
         self.ui.applyButton.connect('clicked(bool)', self.onApplyButton)
         self.ui.pushButton.connect('clicked(bool)', self.onPushButton)
+        self.ui.copyButton.connect('clicked(bool)', self.onCopyButton)
         self.ui.pushButton_mapping.connect('clicked(bool)', self.onPushButton_mapping)
         self.ui.saveButton.connect('clicked(bool)', self.onSaveButton)
         
@@ -906,6 +910,9 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.inputSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
         self.ui.fixedVolumeSelector.setCurrentNode(self._parameterNode.GetNodeReference("fixedVolume"))
         self.ui.checkBox_bipolar.checked = (self._parameterNode.GetParameter("Bipolar") == "true")
+        self.ui.checkBox_transfer.checked = (self._parameterNode.GetParameter("Transfer") == "true")
+        self.ui.inputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputListVolume"))
+        self.ui.outputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputListVolume"))
         self.ui.DirectoryButton.directory = str(self._parameterNode.GetParameter("Directory"))
         self.ui.DirectoryButton_subject.directory = str(self._parameterNode.GetParameter("Directory_Subject"))
         self.ui.SceneName.text = str(self._parameterNode.GetParameter("SceneName"))
@@ -934,10 +941,13 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self._parameterNode.SetNodeReferenceID("InputVolume", self.ui.inputSelector.currentNodeID)
         self._parameterNode.SetNodeReferenceID("fixedVolume", self.ui.fixedVolumeSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("InputListVolume", self.ui.inputListSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("OutputListVolume", self.ui.outputListSelector.currentNodeID)
         self._parameterNode.SetParameter("Directory", str(self.ui.DirectoryButton.directory))
         self._parameterNode.SetParameter("Directory_Subject", str(self.ui.DirectoryButton_subject.directory))
         self._parameterNode.SetParameter("SceneName", str(self.ui.SceneName.text))
         self._parameterNode.SetParameter("Bipolar", "true" if self.ui.checkBox_bipolar.checked else "false")
+        self._parameterNode.SetParameter("Transfer", "true" if self.ui.checkBox_transfer.checked else "false")
 
         self._parameterNode.EndModify(wasModified)
 
@@ -978,6 +988,16 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         sceneName = self.ui.SceneName.text
         # print(sceneName)
         self.logic.save_info(destinyDirectory,sceneName)
+        
+    def onCopyButton(self):
+        
+        inputList = self.ui.inputListSelector.currentNode()
+        outputList = self.ui.outputListSelector.currentNode()
+        checked_transfer = self.ui.checkBox_transfer.checked
+        
+        self.logic.copy_transfer(inputList, outputList, checked_transfer)
+        
+        
 
 
 #
@@ -1039,6 +1059,30 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         
     def regions_partthree(self,destinyDirectory):
         regionsMNI_2(destinyDirectory)
+        
+    def copy_transfer(self,inputList,outputList,transfer):
+                
+        # All markup's names and positions in RAS coordinates
+        markup_names = [inputList.GetNthFiducialLabel(i) for i in range(inputList.GetNumberOfFiducials())]
+        markup_RAS = [NthFiducialPosition(inputList,i) for i in range(inputList.GetNumberOfFiducials())]
+        markup_selected = [inputList.GetNthControlPointSelected(i) for i in range(inputList.GetNumberOfFiducials())]
+        
+        # Just the selected 
+        selected_markup_names = list(compress(markup_names, markup_selected))
+        selected_markup_RAS = list(compress(markup_RAS, markup_selected))
+        
+        for i, markup_name in enumerate(selected_markup_names):
+            # First copy the electrodes in the new list
+            outputList.AddFiducialFromArray(selected_markup_RAS[i], markup_name)
+            outputList.SetNthFiducialLocked(i,True)
+            outputList.SetNthControlPointSelected(i,0)
+            # If transfer is selected, remove those electrodes from the original list
+            if transfer:
+                available_markup_names = [inputList.GetNthFiducialLabel(i) for i in range(inputList.GetNumberOfFiducials())]
+                #  This loop is needed because each time that an electrode is removed from the markup list, it updates, so the index oof the remaining electrodes change
+                for index, og_markup_name in enumerate(available_markup_names):
+                    if markup_name == og_markup_name:
+                        inputList.RemoveNthControlPoint(index)
     
     def save_info(self,destinationDirectory,sceneName):
         
