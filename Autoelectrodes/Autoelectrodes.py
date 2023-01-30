@@ -662,7 +662,7 @@ def regionsMNI_2(destinyDirectory):
         
         
         # Fill dataframe
-        df = pd.DataFrame([[contact, aseg_label, mni_label, round(mni[0]), round(mni[1]), round(mni[2])]], columns=['Contact', 'Aseg', 'MNI', 'X_mni', 'Y_mni', 'Z_mni'])
+        df = pd.DataFrame([[contact, aseg_label, mni_label, mni[0], mni[1], mni[2]]], columns=['Contact', 'Aseg', 'MNI', 'X_mni', 'Y_mni', 'Z_mni'])
         atlas = pd.concat([atlas, df])
 
     # Save the files
