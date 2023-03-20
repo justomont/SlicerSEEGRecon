@@ -2,6 +2,11 @@
  
 This is a 3D Slicer extension for semi-automatic placement of stereo electroencephalography (SEEG) from Annotation Markups.
 
+## System requierements
+
+- Operative system: Windows 11, MacOS BigSur v11.6. Not tested in Linux, but assumed to work.
+- Software: 3D Slicer v5.0.3 (and newer versions).
+
 ## Installation
 
 1. Download 3D Slicer from [https://download.slicer.org](https://download.slicer.org/).
