@@ -18,6 +18,10 @@ from os.path import isfile,join
 
 import time
 
+import warnings
+
+import qt
+
 try:
     import pandas as pd
 except: 
@@ -166,6 +170,22 @@ def findContacts(fidNode,checked_bipolar):
     markups = zip(*sorted(zip(markups,RAS), key=lambda item: (int(item.partition(' ')[0]) if item[0].isdigit() else float('inf'), item)))
     markups, RAS = [list(tuple) for tuple in  markups]
     # print(markups)
+    
+    # WARN THE USER IF THE ELECTRODES DO NOT MATCH
+    test = [''.join([i for i in markup if not i.isdigit()]) for markup in markups]
+    if any([test.count(electrode) for electrode in np.unique(test)]) == 1:
+        unique_count = [test.count(electrode) for electrode in np.unique(test)]
+        bool_count = [count < 2 for count in unique_count]
+        bad_electrodes = list(compress(np.unique(test), bool_count))
+        # popup message
+        msg = qt.QMessageBox()
+        msg.setIcon(qt.QMessageBox.Warning)
+        msg.setText("Warning")
+        msg.setInformativeText("Electrodes tips and ends are not matching")
+        msg.setWindowTitle("Warning!")
+        msg.setDetailedText('Issue with: {}'.format(bad_electrodes))
+        msg.setStandardButtons(qt.QMessageBox.Ok | qt.QMessageBox.Cancel)
+        retval = msg.exec_()
     
     # Store also the location of the end of the electrodes just for representational purposes
     end_boolean = [not element for element in boolean]
@@ -910,7 +930,7 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.inputSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
         self.ui.fixedVolumeSelector.setCurrentNode(self._parameterNode.GetNodeReference("fixedVolume"))
         self.ui.checkBox_bipolar.checked = (self._parameterNode.GetParameter("Bipolar") == "true")
-        self.ui.checkBox_transfer.checked = (self._parameterNode.GetParameter("Transfer") == "true")
+        self.ui.checkBox_transfer.checked = (self._parameterNode.GetParameter("Transfer") == "false")
         self.ui.inputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputListVolume"))
         self.ui.outputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputListVolume"))
         self.ui.DirectoryButton.directory = str(self._parameterNode.GetParameter("Directory"))
