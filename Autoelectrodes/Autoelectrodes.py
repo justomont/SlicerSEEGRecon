@@ -173,7 +173,7 @@ def findContacts(fidNode,checked_bipolar):
     
     # WARN THE USER IF THE ELECTRODES DO NOT MATCH
     test = [''.join([i for i in markup if not i.isdigit()]) for markup in markups]
-    if any([test.count(electrode) for electrode in np.unique(test)]) == 1:
+    if any([counts < 2 for counts in [test.count(electrode) for electrode in np.unique(test)]]):
         unique_count = [test.count(electrode) for electrode in np.unique(test)]
         bool_count = [count < 2 for count in unique_count]
         bad_electrodes = list(compress(np.unique(test), bool_count))
