@@ -1,6 +1,6 @@
 # SlicerAutoelectrodes
  
-Welcome to SlicerAutoelectrodes, a powerful 3D Slicer extension designed to streamline the semi-automatic placement of stereo electroencephalography (SEEG) electrodes using Annotation Markups. Whether you're a researcher, clinician, or enthusiast in the neuroimaging field, this tool aims to enhance your workflow, saving you time and improving accuracy in electrode placement.
+Welcome to SlicerAutoelectrodes, a powerful 3D Slicer module designed to streamline the semi-automatic placement of stereo electroencephalography (SEEG) electrodes using Annotation Markups. Whether you're a researcher, clinician, or enthusiast in the neuroimaging field, this tool aims to enhance your workflow, saving you time and improving accuracy in electrode placement.
 
 By leveraging the capabilities of 3D Slicer, SlicerAutoelectrodes allows you to effortlessly position SEEG electrodes with precision. Simply annotate your points, and let the extension handle the rest, providing you with reliable and reproducible electrode placements. Dive into our comprehensive tutorial to get started and unlock the full potential of your neuroimaging analysis.
 
@@ -12,8 +12,8 @@ By leveraging the capabilities of 3D Slicer, SlicerAutoelectrodes allows you to 
 
 ## Installation
 
-1. Download 3D Slicer from [https://download.slicer.org](https://download.slicer.org/).
-2. Download the zip extension from https://github.com/justomont/SlicerAutoelectrodes.
+1. Download 3D Slicer from their [website](https://download.slicer.org/).
+2. Download the zip module from this repository.
 3. Unzip the folder.
 4. Start 3D Slicer.
 5. Go to Modules (upper bar) and click on the magnifier icon.
@@ -37,3 +37,7 @@ By leveraging the capabilities of 3D Slicer, SlicerAutoelectrodes allows you to 
 6. Once all points for all electrodes are placed, go to Modules Menu > SEEG > Autoelectrodes.
 7. Select the markup list that contains the contacts.
 8. Click on Apply, and the position of all contacts will appear.
+
+## Contributions and Support
+
+We welcome any recommendations, bug reports, or requests. Please feel free to reach out to me directly on X (formerly Twitter) at [@Justo_Montoya_](https://x.com/Justo_Montoya_). Your feedback and contributions are invaluable in making this repository a robust resource for the neuroscience community.
