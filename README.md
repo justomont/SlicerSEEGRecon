@@ -6,6 +6,7 @@ This is a 3D Slicer extension for semi-automatic placement of stereo electroence
 
 - Operative system: Windows 11, MacOS BigSur v11.6. Not tested in Linux, but assumed to work.
 - Software: 3D Slicer v5.0.3 (and newer versions).
+- FreeSurfer Module
 
 ## Installation
 
