@@ -143,7 +143,7 @@ def RAStoIJK(ras,volumeNode):
 
 def NthFiducialPosition(fidNode,n):
     pos = [0,0,0]
-    fidNode.GetNthFiducialPosition(n,pos)
+    fidNode.GetNthControlPointPosition(n,pos)
     return pos
 
 
@@ -155,8 +155,8 @@ def findContacts(fidNode,checked_bipolar):
     asegVoxelArray = slicer.util.arrayFromVolume(asegVolumeNode)
     
     # All markup's names and positions in RAS coordinates
-    markup_names = [fidNode.GetNthFiducialLabel(i) for i in range(fidNode.GetNumberOfFiducials())]
-    markup_RAS = [NthFiducialPosition(fidNode,i) for i in range(fidNode.GetNumberOfFiducials())]
+    markup_names = [fidNode.GetNthControlPointLabel(i) for i in range(fidNode.GetNumberOfControlPoints())]
+    markup_RAS = [NthFiducialPosition(fidNode,i) for i in range(fidNode.GetNumberOfControlPoints())]
     
     # Remove markups that signal the END of the electrode (wich is not the last contact but the tip of the elctrode, outside of the skull)
     boolean = [has_numbers(name) for name in markup_names]
@@ -260,15 +260,15 @@ def findContacts(fidNode,checked_bipolar):
                     if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
                         monopolar_markups_White_Matter.append(markup)
                         monopolar_RAS_White_Matter.append(RAS[index])
-                        fidNode_White_Matter.AddFiducialFromArray(RAS[index], letter+str(digit))
+                        fidNode_White_Matter.AddControlPoint(RAS[index], letter+str(digit))
                     elif "Unknown" in anatomic_position:
                         monopolar_markups_outside_brain.append(markup)
                         monopolar_RAS_outside_brain.append(RAS[index])
-                        fidNode_outside_brain.AddFiducialFromArray(RAS[index], letter+str(digit))
+                        fidNode_outside_brain.AddControlPoint(RAS[index], letter+str(digit))
                     else:
                         monopolar_markups_Grey_Matter.append(markup)
                         monopolar_RAS_Grey_Matter.append(RAS[index])
-                        fidNode_Grey_Matter.AddFiducialFromArray(RAS[index], letter+str(digit))
+                        fidNode_Grey_Matter.AddControlPoint(RAS[index], letter+str(digit))
                         
                 # Calculate how many markups should be added until the next user-defined markup
                 additions = next_digit - digit-1
@@ -284,7 +284,7 @@ def findContacts(fidNode,checked_bipolar):
                     monopolar_markups.append(letter+str(new_digit))
                     monopolar_RAS.append(new_position)
                     
-                    fidNode.AddFiducialFromArray(new_position, letter+str(new_digit))
+                    fidNode.AddControlPoint(new_position, letter+str(new_digit))
                     
                     # IJK and real anatomic location of the rest of the contacts (White Matter/Grey Matter/Outside), but not the last one
                     ijk_position = RAStoIJK(new_position, asegVolumeNode)
@@ -294,15 +294,15 @@ def findContacts(fidNode,checked_bipolar):
                     if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
                         monopolar_markups_White_Matter.append(letter+str(new_digit))
                         monopolar_RAS_White_Matter.append(new_position)
-                        fidNode_White_Matter.AddFiducialFromArray(new_position, letter+str(new_digit))
+                        fidNode_White_Matter.AddControlPoint(new_position, letter+str(new_digit))
                     elif "Unknown" in anatomic_position:
                         monopolar_markups_outside_brain.append(letter+str(new_digit))
                         monopolar_RAS_outside_brain.append(new_position)
-                        fidNode_outside_brain.AddFiducialFromArray(new_position, letter+str(new_digit))
+                        fidNode_outside_brain.AddControlPoint(new_position, letter+str(new_digit))
                     else:
                         monopolar_markups_Grey_Matter.append(letter+str(new_digit))
                         monopolar_RAS_Grey_Matter.append(new_position)
-                        fidNode_Grey_Matter.AddFiducialFromArray(new_position, letter+str(new_digit))
+                        fidNode_Grey_Matter.AddControlPoint(new_position, letter+str(new_digit))
                 
                 # At this point we have reached the last node of the electrode, we can directly add it
                 monopolar_markups.append(letter+str(additions+2)) # Here the name of the node is additions+2 to account for the 1st one and last one (this) 
@@ -316,15 +316,15 @@ def findContacts(fidNode,checked_bipolar):
                 if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
                     monopolar_markups_White_Matter.append(letter+str(additions+2))   
                     monopolar_RAS_White_Matter.append(RAS[index+1])
-                    fidNode_White_Matter.AddFiducialFromArray(RAS[index+1], letter+str(additions+2))
+                    fidNode_White_Matter.AddControlPoint(RAS[index+1], letter+str(additions+2))
                 elif "Unknown" in anatomic_position:
                     monopolar_markups_outside_brain.append(letter+str(additions+2))
                     monopolar_RAS_outside_brain.append(RAS[index+1])
-                    fidNode_outside_brain.AddFiducialFromArray(RAS[index+1], letter+str(additions+2))
+                    fidNode_outside_brain.AddControlPoint(RAS[index+1], letter+str(additions+2))
                 else:
                     monopolar_markups_Grey_Matter.append(letter+str(additions+2))
                     monopolar_RAS_Grey_Matter.append(RAS[index+1])
-                    fidNode_Grey_Matter.AddFiducialFromArray(RAS[index+1], letter+str(additions+2))
+                    fidNode_Grey_Matter.AddControlPoint(RAS[index+1], letter+str(additions+2))
                 
                 #Create rulers where the whole electrodes are
                 rulerNode = slicer.vtkMRMLAnnotationRulerNode()
@@ -355,6 +355,7 @@ def findContacts(fidNode,checked_bipolar):
             # if the letter is not the same as the next one it means we found the last markup of the electrode, 
             # thus we can extend this last section to better grpahically represent the electrode
             else:
+                
                 # compute the vector that defines the line that passes through the last point and the penultimate user-defined markup
                 pointA = RAS[index-1]
                 pointB = RAS[index]
@@ -371,7 +372,7 @@ def findContacts(fidNode,checked_bipolar):
                 # project the last markup (E) onto the line generated by AB
                 P = pointA + np.dot(AE,AB) / np.dot(AB,AB) * AB
                 # generate projection on Slicer 
-                fidNodeE.AddFiducialFromArray(P,letter)
+                fidNodeE.AddControlPoint(P,letter)
                 # add ruler
                 rulerNode = slicer.vtkMRMLAnnotationRulerNode()
                 
@@ -415,7 +416,7 @@ def findContacts(fidNode,checked_bipolar):
             # project the last markup (E) onto the line generated by AB
             P = pointA + np.dot(AE,AB) / np.dot(AB,AB) * AB
             # generate projection on Slicer 
-            fidNodeE.AddFiducialFromArray(P,letter)
+            fidNodeE.AddControlPoint(P,letter)
             # add ruler
             rulerNode = slicer.vtkMRMLAnnotationRulerNode()
             
@@ -450,18 +451,21 @@ def findContacts(fidNode,checked_bipolar):
     
     print("\nNUMBER OF CONTACTS: \nWhite Matter: {} \nGrey Matter: {} \nOutside of brain: {}".format(number_nodes_White_Matter, number_nodes_Grey_Matter, number_nodes_outside_brain))
     
-    # Lock all markups
-    for markupN in range(fidNode.GetNumberOfMarkups()):
-        fidNode.SetNthFiducialLocked(markupN,True)
-        fidNode.SetNthControlPointSelected(markupN,1)
-    for markupN in range(fidNode_White_Matter.GetNumberOfMarkups()):
-        fidNode_White_Matter.SetNthFiducialLocked(markupN,True)
+    # Lock and select all markups
+    for markupN in range(fidNode.GetNumberOfControlPoints()):
+        fidNode.SetNthControlPointLocked(markupN,True) # Lock 
+        fidNode.SetNthControlPointSelected(markupN,1) # Select
+    for markupN in range(fidNode_White_Matter.GetNumberOfControlPoints()):
+        fidNode_White_Matter.SetNthControlPointLocked(markupN,True)
         fidNode_White_Matter.SetNthControlPointSelected(markupN,1)
-    for markupN in range(fidNode_Grey_Matter.GetNumberOfMarkups()):
-        fidNode_Grey_Matter.SetNthFiducialLocked(markupN,True)
+    for markupN in range(fidNode_Grey_Matter.GetNumberOfControlPoints()):
+        fidNode_Grey_Matter.SetNthControlPointLocked(markupN,True)
         fidNode_Grey_Matter.SetNthControlPointSelected(markupN,1)
-    for markupN in range(fidNodeE.GetNumberOfMarkups()):
-        fidNodeE.SetNthFiducialLocked(markupN,True)
+    for markupN in range(fidNode_outside_brain.GetNumberOfControlPoints()):
+        fidNode_outside_brain.SetNthControlPointLocked(markupN,True)
+        fidNode_outside_brain.SetNthControlPointSelected(markupN,1)
+    for markupN in range(fidNodeE.GetNumberOfControlPoints()):
+        fidNodeE.SetNthControlPointLocked(markupN,True)
         fidNodeE.SetNthControlPointSelected(markupN,1)
     
     if P[0] > 0:
@@ -555,7 +559,7 @@ def findContacts(fidNode,checked_bipolar):
                     bipolar_markups.append(bi_tag)
                     bipolar_RAS.append(middle_point)
                     
-                    fidNode_Bipolar.AddFiducialFromArray(middle_point, bi_tag)
+                    fidNode_Bipolar.AddControlPoint(middle_point, bi_tag)
                     
                     # IJK and real anatomic location of the contact (White Matter/Grey Matter/Outside)
                     ijk_position = RAStoIJK(middle_point, asegVolumeNode)
@@ -565,25 +569,25 @@ def findContacts(fidNode,checked_bipolar):
                     if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
                         bipolar_markups_White_Matter.append(bi_tag)
                         bipolar_RAS_White_Matter.append(middle_point)
-                        fidNode_Bipolar_White_Matter.AddFiducialFromArray(middle_point, bi_tag)
+                        fidNode_Bipolar_White_Matter.AddControlPoint(middle_point, bi_tag)
                     elif "Unknown" in anatomic_position:
                         bipolar_markups_outside_brain.append(bi_tag)
                         bipolar_RAS_outside_brain.append(middle_point)
-                        fidNode_Bipolar_outside_brain.AddFiducialFromArray(middle_point, bi_tag)
+                        fidNode_Bipolar_outside_brain.AddControlPoint(middle_point, bi_tag)
                     else:
                         bipolar_markups_Grey_Matter.append(bi_tag)
                         bipolar_RAS_Grey_Matter.append(middle_point)
-                        fidNode_Bipolar_Grey_Matter.AddFiducialFromArray(middle_point, bi_tag)
+                        fidNode_Bipolar_Grey_Matter.AddControlPoint(middle_point, bi_tag)
                     
         # Lock all markups
-        for markupN in range(fidNode_Bipolar.GetNumberOfMarkups()):
-            fidNode_Bipolar.SetNthFiducialLocked(markupN,True)
+        for markupN in range(fidNode_Bipolar.GetNumberOfControlPoints()):
+            fidNode_Bipolar.SetNthControlPointLocked(markupN,True)
             fidNode_Bipolar.SetNthControlPointSelected(markupN,0)
-        for markupN in range(fidNode_Bipolar_White_Matter.GetNumberOfMarkups()):
-            fidNode_Bipolar_White_Matter.SetNthFiducialLocked(markupN,True)
+        for markupN in range(fidNode_Bipolar_White_Matter.GetNumberOfControlPoints()):
+            fidNode_Bipolar_White_Matter.SetNthControlPointLocked(markupN,True)
             fidNode_Bipolar_White_Matter.SetNthControlPointSelected(markupN,0)
-        for markupN in range(fidNode_Bipolar_Grey_Matter.GetNumberOfMarkups()):
-            fidNode_Bipolar_Grey_Matter.SetNthFiducialLocked(markupN,True)
+        for markupN in range(fidNode_Bipolar_Grey_Matter.GetNumberOfControlPoints()):
+            fidNode_Bipolar_Grey_Matter.SetNthControlPointLocked(markupN,True)
             fidNode_Bipolar_Grey_Matter.SetNthControlPointSelected(markupN,0)
         
         if P[0] > 0:
@@ -620,6 +624,18 @@ def findContacts(fidNode,checked_bipolar):
         fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetTextScale(0)
         
         logging.info("Bipolar contact placement complete.\n") 
+
+def computeBrainVolume(brainModelNode):
+    
+    mesh = brainModelNode.GetMesh()
+    mass = vtk.vtkMassProperties()
+    mass.SetInputData(mesh)
+    mass.Update()
+    
+    # Obtain the volume in cm^3
+    brain_volume = mass.GetVolume()/1000 # The /1000 is to convert from mm^3 which is the default
+    
+    return brain_volume
         
 def registerMNI(fixedVolumeNode):
     global mniPath, linearTransformNode
@@ -1150,9 +1166,9 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
     def copy_transfer(self,inputList,outputList,transfer):
                 
         # All markup's names and positions in RAS coordinates
-        markup_names = [inputList.GetNthFiducialLabel(i) for i in range(inputList.GetNumberOfFiducials())]
-        markup_RAS = [NthFiducialPosition(inputList,i) for i in range(inputList.GetNumberOfFiducials())]
-        markup_selected = [inputList.GetNthControlPointSelected(i) for i in range(inputList.GetNumberOfFiducials())]
+        markup_names = [inputList.GetNthControlPointLabel(i) for i in range(inputList.GetNumberOfControlPoints())]
+        markup_RAS = [NthFiducialPosition(inputList,i) for i in range(inputList.GetNumberOfControlPoints())]
+        markup_selected = [inputList.GetNthControlPointSelected(i) for i in range(inputList.GetNumberOfControlPoints())]
         
         # Just the selected 
         selected_markup_names = list(compress(markup_names, markup_selected))
@@ -1160,12 +1176,12 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         
         for i, markup_name in enumerate(selected_markup_names):
             # First copy the electrodes in the new list
-            outputList.AddFiducialFromArray(selected_markup_RAS[i], markup_name)
-            outputList.SetNthFiducialLocked(i,True)
+            outputList.AddControlPoint(selected_markup_RAS[i], markup_name)
+            outputList.SetNthControlPointLocked(i,True)
             outputList.SetNthControlPointSelected(i,0)
             # If transfer is selected, remove those electrodes from the original list
             if transfer:
-                available_markup_names = [inputList.GetNthFiducialLabel(i) for i in range(inputList.GetNumberOfFiducials())]
+                available_markup_names = [inputList.GetNthControlPointLabel(i) for i in range(inputList.GetNumberOfControlPoints())]
                 #  This loop is needed because each time that an electrode is removed from the markup list, it updates, so the index oof the remaining electrodes change
                 for index, og_markup_name in enumerate(available_markup_names):
                     if markup_name == og_markup_name:
