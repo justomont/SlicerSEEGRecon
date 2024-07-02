@@ -194,8 +194,9 @@ def findContacts(fidNode,checked_bipolar):
     end_tuples = zip(*sorted(zip(end_markup_names, end_markup_RAS)))
     end_markups, end_RAS = [list(tuple) for tuple in  end_tuples]
     
+    
     #############################################################################
-    # Monopolar. The tool just adds the contacts where they really are in space.#
+    # MONOPOLAR: The tool just adds the contacts where they really are in space.#
     #############################################################################
     # Goal: Compute the position of the remaining contacts and include them in the monopolar markup list (real-R/L)
     
@@ -204,22 +205,32 @@ def findContacts(fidNode,checked_bipolar):
     monopolar_markups = []
     monopolar_RAS = []
     
-    monopolar_markups_WM = []
-    monopolar_RAS_WM = []
-    fidNodeWM = slicer.vtkMRMLMarkupsFiducialNode()
-    fidNodeWM.SetName(fidNode.GetName()+"-WM")
-    slicer.mrmlScene.AddNode(fidNodeWM)
+    # Initialize the variables where the WHITE matter nodes will be stored
+    monopolar_markups_White_Matter = []
+    monopolar_RAS_White_Matter = []
+    fidNode_White_Matter = slicer.vtkMRMLMarkupsFiducialNode()
+    fidNode_White_Matter.SetName(fidNode.GetName()+"_White_Matter")
+    slicer.mrmlScene.AddNode(fidNode_White_Matter)
     
-    monopolar_markups_P = []
-    monopolar_RAS_P = []
-    fidNodeP = slicer.vtkMRMLMarkupsFiducialNode()
-    fidNodeP.SetName(fidNode.GetName()+"-P")
-    slicer.mrmlScene.AddNode(fidNodeP)
+    # Initialize the variables where the GREY matter nodes will be stored
+    monopolar_markups_Grey_Matter = []
+    monopolar_RAS_Grey_Matter = []
+    fidNode_Grey_Matter = slicer.vtkMRMLMarkupsFiducialNode()
+    fidNode_Grey_Matter.SetName(fidNode.GetName()+"_Grey_Matter")
+    slicer.mrmlScene.AddNode(fidNode_Grey_Matter)
     
+    # Initialize the variables where the nodes OUTSIDE of the brain will be stored
+    monopolar_markups_outside_brain = []
+    monopolar_RAS_outside_brain = []
+    fidNode_outside_brain = slicer.vtkMRMLMarkupsFiducialNode()
+    fidNode_outside_brain.SetName(fidNode.GetName()+"_outside_brain")
+    slicer.mrmlScene.AddNode(fidNode_outside_brain)
+    
+    # Initialize the variables where the END nodes will be stored (nodes that refer to the end of the electrode shaft, outside the skull)
     monopolar_markups_E = []
     monopolar_RAS_E = []
     fidNodeE = slicer.vtkMRMLMarkupsFiducialNode()
-    fidNodeE.SetName(fidNode.GetName()+"-ends")
+    fidNodeE.SetName(fidNode.GetName()+"_ends")
     slicer.mrmlScene.AddNode(fidNodeE)
     
     # Iterate over all the markups defined by the user
@@ -235,58 +246,85 @@ def findContacts(fidNode,checked_bipolar):
             
             # If they have the same letter we can continue because it means that are part of the same electrode
             if letter == next_letter:
-                # add initial contact to the new list
+                
+                # In case that the node was not initially defined, add initial contact to the new list
                 if markup not in monopolar_markups:
                     monopolar_markups.append(markup)
                     monopolar_RAS.append(RAS[index])
-                    # check location of the contact (WM or not)
+                    
+                    # IJK and real anatomic location of that 1st contact (White Matter/Grey Matter/Outside)
                     ijk_position = RAStoIJK(RAS[index], asegVolumeNode)
                     anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
+                    
+                    # Store the node in the corresponding volume
                     if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
-                        monopolar_markups_WM.append(markup)
-                        monopolar_RAS_WM.append(RAS[index])
-                        fidNodeWM.AddFiducialFromArray(RAS[index], letter+str(digit))
+                        monopolar_markups_White_Matter.append(markup)
+                        monopolar_RAS_White_Matter.append(RAS[index])
+                        fidNode_White_Matter.AddFiducialFromArray(RAS[index], letter+str(digit))
+                    elif "Unknown" in anatomic_position:
+                        monopolar_markups_outside_brain.append(markup)
+                        monopolar_RAS_outside_brain.append(RAS[index])
+                        fidNode_outside_brain.AddFiducialFromArray(RAS[index], letter+str(digit))
                     else:
-                        monopolar_markups_P.append(markup)
-                        monopolar_RAS_P.append(RAS[index])
-                        fidNodeP.AddFiducialFromArray(RAS[index], letter+str(digit))
-                # calculate how many markups should be added until the next user-defined markup
+                        monopolar_markups_Grey_Matter.append(markup)
+                        monopolar_RAS_Grey_Matter.append(RAS[index])
+                        fidNode_Grey_Matter.AddFiducialFromArray(RAS[index], letter+str(digit))
+                        
+                # Calculate how many markups should be added until the next user-defined markup
                 additions = next_digit - digit-1
-                # calculate how distant the markups should be
+                
+                # Calculate how distant the markups should be
                 distance = np.subtract(RAS[index+1], RAS[index])/(additions+1)
-                # add these new markups
+                
+                # Add these new markups
                 for i in range(additions):
+                    
                     new_digit = digit+i+1
-                    # new_position = np.add(RAS[index], distance*(digit+i))
                     new_position = np.add(RAS[index], distance*(i+1))
                     monopolar_markups.append(letter+str(new_digit))
                     monopolar_RAS.append(new_position)
                     
                     fidNode.AddFiducialFromArray(new_position, letter+str(new_digit))
                     
+                    # IJK and real anatomic location of the rest of the contacts (White Matter/Grey Matter/Outside), but not the last one
                     ijk_position = RAStoIJK(new_position, asegVolumeNode)
                     anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
-                    if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
-                        monopolar_markups_WM.append(letter+str(new_digit))
-                        monopolar_RAS_WM.append(new_position)
-                        fidNodeWM.AddFiducialFromArray(new_position, letter+str(new_digit))
-                    else:
-                        monopolar_markups_P.append(letter+str(new_digit))
-                        monopolar_RAS_P.append(new_position)
-                        fidNodeP.AddFiducialFromArray(new_position, letter+str(new_digit))
                     
-                monopolar_markups.append(markups[index+1])
+                    # Store the node in the corresponding volume
+                    if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
+                        monopolar_markups_White_Matter.append(letter+str(new_digit))
+                        monopolar_RAS_White_Matter.append(new_position)
+                        fidNode_White_Matter.AddFiducialFromArray(new_position, letter+str(new_digit))
+                    elif "Unknown" in anatomic_position:
+                        monopolar_markups_outside_brain.append(letter+str(new_digit))
+                        monopolar_RAS_outside_brain.append(new_position)
+                        fidNode_outside_brain.AddFiducialFromArray(new_position, letter+str(new_digit))
+                    else:
+                        monopolar_markups_Grey_Matter.append(letter+str(new_digit))
+                        monopolar_RAS_Grey_Matter.append(new_position)
+                        fidNode_Grey_Matter.AddFiducialFromArray(new_position, letter+str(new_digit))
+                
+                # At this point we have reached the last node of the electrode, we can directly add it
+                monopolar_markups.append(letter+str(additions+2)) # Here the name of the node is additions+2 to account for the 1st one and last one (this) 
                 monopolar_RAS.append(RAS[index+1])
-                ijk_position = RAStoIJK(new_position, asegVolumeNode)
+                
+                # IJK and real anatomic location of the last contact (White Matter/Grey Matter/Outside)
+                ijk_position = RAStoIJK(RAS[index+1], asegVolumeNode)
                 anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
+                
+                # Store the node in the corresponding volume
                 if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
-                    monopolar_markups_WM.append(markups[index+1])
-                    monopolar_RAS_WM.append(RAS[index+1])
-                    fidNodeWM.AddFiducialFromArray(RAS[index+1], markups[index+1])
+                    monopolar_markups_White_Matter.append(letter+str(additions+2))   
+                    monopolar_RAS_White_Matter.append(RAS[index+1])
+                    fidNode_White_Matter.AddFiducialFromArray(RAS[index+1], letter+str(additions+2))
+                elif "Unknown" in anatomic_position:
+                    monopolar_markups_outside_brain.append(letter+str(additions+2))
+                    monopolar_RAS_outside_brain.append(RAS[index+1])
+                    fidNode_outside_brain.AddFiducialFromArray(RAS[index+1], letter+str(additions+2))
                 else:
-                    monopolar_markups_P.append(markups[index+1])
-                    monopolar_RAS_P.append(RAS[index+1])
-                    fidNodeP.AddFiducialFromArray(RAS[index+1], markups[index+1])
+                    monopolar_markups_Grey_Matter.append(letter+str(additions+2))
+                    monopolar_RAS_Grey_Matter.append(RAS[index+1])
+                    fidNode_Grey_Matter.AddFiducialFromArray(RAS[index+1], letter+str(additions+2))
                 
                 #Create rulers where the whole electrodes are
                 rulerNode = slicer.vtkMRMLAnnotationRulerNode()
@@ -405,16 +443,23 @@ def findContacts(fidNode,checked_bipolar):
             rulerNode.GetDisplayNode().SetMaxTicks(0)
             rulerNode.SetLocked(True)
             
+    # Count the number of contacts on each of the different locations (White Matter/Grey Matter/Outside)
+    number_nodes_White_Matter = len(monopolar_markups_White_Matter)
+    number_nodes_Grey_Matter = len(monopolar_markups_Grey_Matter)
+    number_nodes_outside_brain = len(monopolar_markups_outside_brain)
+    
+    print("\nNUMBER OF CONTACTS: \nWhite Matter: {} \nGrey Matter: {} \nOutside of brain: {}".format(number_nodes_White_Matter, number_nodes_Grey_Matter, number_nodes_outside_brain))
+    
     # Lock all markups
     for markupN in range(fidNode.GetNumberOfMarkups()):
         fidNode.SetNthFiducialLocked(markupN,True)
         fidNode.SetNthControlPointSelected(markupN,1)
-    for markupN in range(fidNodeWM.GetNumberOfMarkups()):
-        fidNodeWM.SetNthFiducialLocked(markupN,True)
-        fidNodeWM.SetNthControlPointSelected(markupN,1)
-    for markupN in range(fidNodeP.GetNumberOfMarkups()):
-        fidNodeP.SetNthFiducialLocked(markupN,True)
-        fidNodeP.SetNthControlPointSelected(markupN,1)
+    for markupN in range(fidNode_White_Matter.GetNumberOfMarkups()):
+        fidNode_White_Matter.SetNthFiducialLocked(markupN,True)
+        fidNode_White_Matter.SetNthControlPointSelected(markupN,1)
+    for markupN in range(fidNode_Grey_Matter.GetNumberOfMarkups()):
+        fidNode_Grey_Matter.SetNthFiducialLocked(markupN,True)
+        fidNode_Grey_Matter.SetNthControlPointSelected(markupN,1)
     for markupN in range(fidNodeE.GetNumberOfMarkups()):
         fidNodeE.SetNthFiducialLocked(markupN,True)
         fidNodeE.SetNthControlPointSelected(markupN,1)
@@ -422,18 +467,18 @@ def findContacts(fidNode,checked_bipolar):
     if P[0] > 0:
         # SELECTED Color for the right hemisphere
         fidNode.GetDisplayNode().SetSelectedColor([0/255,85/255,225/255])
-        fidNodeWM.GetDisplayNode().SetSelectedColor([0/255,85/255,225/255])
-        fidNodeP.GetDisplayNode().SetSelectedColor([0/255,85/255,225/255])
+        fidNode_White_Matter.GetDisplayNode().SetSelectedColor([0/255,85/255,225/255])
+        fidNode_Grey_Matter.GetDisplayNode().SetSelectedColor([0/255,85/255,225/255])
         fidNodeE.GetDisplayNode().SetSelectedColor([0/255,85/255,225/255])
         # UNselected Color for the right hemisphere
         fidNode.GetDisplayNode().SetColor([0/255,0/255,225/255])
-        fidNodeWM.GetDisplayNode().SetColor([0/255,0/255,225/255])
-        fidNodeP.GetDisplayNode().SetColor([0/255,0/255,225/255])
+        fidNode_White_Matter.GetDisplayNode().SetColor([0/255,0/255,225/255])
+        fidNode_Grey_Matter.GetDisplayNode().SetColor([0/255,0/255,225/255])
         fidNodeE.GetDisplayNode().SetColor([0/255,0/255,225/255])
     else:
         fidNode.GetDisplayNode().SetColor([170/255,0/255,0/255])
-        fidNodeWM.GetDisplayNode().SetColor([170/255,0/255,0/255])
-        fidNodeP.GetDisplayNode().SetColor([170/255,0/255,0/255])
+        fidNode_White_Matter.GetDisplayNode().SetColor([170/255,0/255,0/255])
+        fidNode_Grey_Matter.GetDisplayNode().SetColor([170/255,0/255,0/255])
         fidNodeE.GetDisplayNode().SetColor([170/255,0/255,0/255])
     
     # Gliph type
@@ -441,116 +486,138 @@ def findContacts(fidNode,checked_bipolar):
     fidNode.GetDisplayNode().SetGlyphScale(5)
     fidNode.GetDisplayNode().SetTextScale(0)
     
-    fidNodeWM.GetDisplayNode().SetGlyphType(8)
-    fidNodeWM.GetDisplayNode().SetGlyphScale(3)
-    fidNodeWM.GetDisplayNode().SetTextScale(0)
-    fidNodeWM.GetDisplayNode().SetVisibility(False)
+    fidNode_White_Matter.GetDisplayNode().SetGlyphType(8)
+    fidNode_White_Matter.GetDisplayNode().SetGlyphScale(3)
+    fidNode_White_Matter.GetDisplayNode().SetTextScale(0)
+    fidNode_White_Matter.GetDisplayNode().SetVisibility(False)
     
-    fidNodeP.GetDisplayNode().SetGlyphType(8)
-    fidNodeP.GetDisplayNode().SetGlyphScale(3)
-    fidNodeP.GetDisplayNode().SetTextScale(0)
-    fidNodeWM.GetDisplayNode().SetVisibility(False)
+    fidNode_Grey_Matter.GetDisplayNode().SetGlyphType(8)
+    fidNode_Grey_Matter.GetDisplayNode().SetGlyphScale(3)
+    fidNode_Grey_Matter.GetDisplayNode().SetTextScale(0)
+    fidNode_White_Matter.GetDisplayNode().SetVisibility(False)
     
     fidNodeE.GetDisplayNode().SetGlyphType(8)
     fidNodeE.GetDisplayNode().SetGlyphScale(3)
     fidNodeE.GetDisplayNode().SetTextScale(0)
-    fidNodeWM.GetDisplayNode().SetVisibility(False)
+    fidNode_White_Matter.GetDisplayNode().SetVisibility(False)
     
     fidNode.GetDisplayNode().SetVisibility(True)
     
     logging.info("Monopolar contact placement complete.\n") 
    
     
-    if checked_bipolar:
-        # Bipolar 
-        fidNodeBi = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNodeBi.SetName("Bipolar-"+fidNode.GetName())
-        slicer.mrmlScene.AddNode(fidNodeBi)
+    ###########
+    # BIPOLAR #
+    ###########
+    
+    # If the user specified that they want the bipolar representation
+    if checked_bipolar: 
+        
+        # Initialize the variables where the BIPOLAR referenced nodes will be stored (This location is not real, just a representacion of where the re-referenced source would be)
+        fidNode_Bipolar = slicer.vtkMRMLMarkupsFiducialNode()
+        fidNode_Bipolar.SetName("Bipolar_"+fidNode.GetName())
+        slicer.mrmlScene.AddNode(fidNode_Bipolar)
         bipolar_markups = []
         bipolar_RAS = []
         
-        fidNodeBi_WM = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNodeBi_WM.SetName("Bipolar-"+fidNode.GetName()+"-WM")
-        slicer.mrmlScene.AddNode(fidNodeBi_WM)
-        bipolar_markups_WM = []
-        bipolar_RAS_WM = []
+        # Initialize the variables where the BIPOLAR WHITE matter nodes will be stored
+        fidNode_Bipolar_White_Matter = slicer.vtkMRMLMarkupsFiducialNode()
+        fidNode_Bipolar_White_Matter.SetName("Bipolar_"+fidNode.GetName()+"_White_Matter")
+        slicer.mrmlScene.AddNode(fidNode_Bipolar_White_Matter)
+        bipolar_markups_White_Matter = []
+        bipolar_RAS_White_Matter = []
         
-        fidNodeBi_P = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNodeBi_P.SetName("Bipolar-"+fidNode.GetName()+"-P")
-        slicer.mrmlScene.AddNode(fidNodeBi_P)
-        bipolar_markups_P = []
-        bipolar_RAS_P = []
+        # Initialize the variables where the BIPOLAR GREY matter nodes will be stored
+        fidNode_Bipolar_Grey_Matter = slicer.vtkMRMLMarkupsFiducialNode()
+        fidNode_Bipolar_Grey_Matter.SetName("Bipolar_"+fidNode.GetName()+"_Grey_Matter")
+        slicer.mrmlScene.AddNode(fidNode_Bipolar_Grey_Matter)
+        bipolar_markups_Grey_Matter = []
+        bipolar_RAS_Grey_Matter = []
         
+        # Initialize the variables where the BIPOLAR nodes OUTSIDE of the brain will be stored
+        fidNode_Bipolar_outside_brain = slicer.vtkMRMLMarkupsFiducialNode()
+        fidNode_Bipolar_outside_brain.SetName("Bipolar_"+fidNode.GetName()+"_Outside")
+        slicer.mrmlScene.AddNode(fidNode_Bipolar_outside_brain)
+        bipolar_markups_outside_brain = []
+        bipolar_RAS_outside_brain = []
         
         for index,markup in enumerate(monopolar_markups):
             if index < len(monopolar_markups)-1:
+                
                 letter = ''.join([i for i in markup if not i.isdigit()])
                 digit = int(re.search(r'\d+', markup).group())
                 next_letter = ''.join([i for i in monopolar_markups[index+1] if not i.isdigit()])
                 next_digit = int(re.search(r'\d+', monopolar_markups[index+1]).group())
-                
+                                
                 if letter == next_letter:
                     middle_point = np.add(monopolar_RAS[index+1], monopolar_RAS[index])/2
                     bi_tag = "-".join([letter+str(digit),monopolar_markups[index+1]])
                     bipolar_markups.append(bi_tag)
                     bipolar_RAS.append(middle_point)
                     
-                    fidNodeBi.AddFiducialFromArray(middle_point, bi_tag)
+                    fidNode_Bipolar.AddFiducialFromArray(middle_point, bi_tag)
                     
+                    # IJK and real anatomic location of the contact (White Matter/Grey Matter/Outside)
                     ijk_position = RAStoIJK(middle_point, asegVolumeNode)
                     anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
+                    
+                    # Store the node in the corresponding volume
                     if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
-                        bipolar_markups_WM.append(bi_tag)
-                        bipolar_RAS_WM.append(middle_point)
-                        fidNodeBi_WM.AddFiducialFromArray(middle_point, bi_tag)
+                        bipolar_markups_White_Matter.append(bi_tag)
+                        bipolar_RAS_White_Matter.append(middle_point)
+                        fidNode_Bipolar_White_Matter.AddFiducialFromArray(middle_point, bi_tag)
+                    elif "Unknown" in anatomic_position:
+                        bipolar_markups_outside_brain.append(bi_tag)
+                        bipolar_RAS_outside_brain.append(middle_point)
+                        fidNode_Bipolar_outside_brain.AddFiducialFromArray(middle_point, bi_tag)
                     else:
-                        bipolar_markups_P.append(bi_tag)
-                        bipolar_RAS_P.append(middle_point)
-                        fidNodeBi_P.AddFiducialFromArray(middle_point, bi_tag)
+                        bipolar_markups_Grey_Matter.append(bi_tag)
+                        bipolar_RAS_Grey_Matter.append(middle_point)
+                        fidNode_Bipolar_Grey_Matter.AddFiducialFromArray(middle_point, bi_tag)
                     
         # Lock all markups
-        for markupN in range(fidNodeBi.GetNumberOfMarkups()):
-            fidNodeBi.SetNthFiducialLocked(markupN,True)
-            fidNodeBi.SetNthControlPointSelected(markupN,0)
-        for markupN in range(fidNodeBi_WM.GetNumberOfMarkups()):
-            fidNodeBi_WM.SetNthFiducialLocked(markupN,True)
-            fidNodeBi_WM.SetNthControlPointSelected(markupN,0)
-        for markupN in range(fidNodeBi_P.GetNumberOfMarkups()):
-            fidNodeBi_P.SetNthFiducialLocked(markupN,True)
-            fidNodeBi_P.SetNthControlPointSelected(markupN,0)
+        for markupN in range(fidNode_Bipolar.GetNumberOfMarkups()):
+            fidNode_Bipolar.SetNthFiducialLocked(markupN,True)
+            fidNode_Bipolar.SetNthControlPointSelected(markupN,0)
+        for markupN in range(fidNode_Bipolar_White_Matter.GetNumberOfMarkups()):
+            fidNode_Bipolar_White_Matter.SetNthFiducialLocked(markupN,True)
+            fidNode_Bipolar_White_Matter.SetNthControlPointSelected(markupN,0)
+        for markupN in range(fidNode_Bipolar_Grey_Matter.GetNumberOfMarkups()):
+            fidNode_Bipolar_Grey_Matter.SetNthFiducialLocked(markupN,True)
+            fidNode_Bipolar_Grey_Matter.SetNthControlPointSelected(markupN,0)
         
         if P[0] > 0:
             # SELECTED color for the right hemisphere
-            fidNodeBi.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
-            fidNodeBi_WM.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
-            fidNodeBi_P.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+            fidNode_Bipolar.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+            fidNode_Bipolar_White_Matter.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+            fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
             # UNselected
-            fidNodeBi.GetDisplayNode().SetColor([0/255,0/255,0/255])
-            fidNodeBi_WM.GetDisplayNode().SetColor([0/255,0/255,0/255])
-            fidNodeBi_P.GetDisplayNode().SetColor([0/255,0/255,0/255])
+            fidNode_Bipolar.GetDisplayNode().SetColor([0/255,0/255,0/255])
+            fidNode_Bipolar_White_Matter.GetDisplayNode().SetColor([0/255,0/255,0/255])
+            fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetColor([0/255,0/255,0/255])
             
         else:
             # Selected
-            fidNodeBi.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
-            fidNodeBi_WM.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
-            fidNodeBi_P.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+            fidNode_Bipolar.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+            fidNode_Bipolar_White_Matter.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+            fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
             # Unselected
-            fidNodeBi.GetDisplayNode().SetColor([0/255,0/255,0/255])
-            fidNodeBi_WM.GetDisplayNode().SetColor([0/255,0/255,0/255])
-            fidNodeBi_P.GetDisplayNode().SetColor([0/255,0/255,0/255])
+            fidNode_Bipolar.GetDisplayNode().SetColor([0/255,0/255,0/255])
+            fidNode_Bipolar_White_Matter.GetDisplayNode().SetColor([0/255,0/255,0/255])
+            fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetColor([0/255,0/255,0/255])
         
         # Gliph type
-        fidNodeBi.GetDisplayNode().SetGlyphType(8)
-        fidNodeBi.GetDisplayNode().SetGlyphScale(3)
-        fidNodeBi.GetDisplayNode().SetTextScale(0)
+        fidNode_Bipolar.GetDisplayNode().SetGlyphType(8)
+        fidNode_Bipolar.GetDisplayNode().SetGlyphScale(3)
+        fidNode_Bipolar.GetDisplayNode().SetTextScale(0)
         
-        fidNodeBi_WM.GetDisplayNode().SetGlyphType(8)
-        fidNodeBi_WM.GetDisplayNode().SetGlyphScale(3)
-        fidNodeBi_WM.GetDisplayNode().SetTextScale(0)
+        fidNode_Bipolar_White_Matter.GetDisplayNode().SetGlyphType(8)
+        fidNode_Bipolar_White_Matter.GetDisplayNode().SetGlyphScale(3)
+        fidNode_Bipolar_White_Matter.GetDisplayNode().SetTextScale(0)
         
-        fidNodeBi_P.GetDisplayNode().SetGlyphType(8)
-        fidNodeBi_P.GetDisplayNode().SetGlyphScale(3)
-        fidNodeBi_P.GetDisplayNode().SetTextScale(0)
+        fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetGlyphType(8)
+        fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetGlyphScale(3)
+        fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetTextScale(0)
         
         logging.info("Bipolar contact placement complete.\n") 
         
