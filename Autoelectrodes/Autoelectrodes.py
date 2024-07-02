@@ -192,7 +192,7 @@ def findContacts(fidNode,checked_bipolar):
     end_markup_names = list(compress(markup_names, end_boolean))
     end_markup_RAS = list(compress(markup_RAS, end_boolean))
     end_tuples = zip(*sorted(zip(end_markup_names, end_markup_RAS)))
-    end_markups, end_RAS = [list(tuple) for tuple in  end_tuples]
+    # end_markups, end_RAS = [list(tuple) for tuple in  end_tuples]
     
     
     #############################################################################
@@ -363,8 +363,10 @@ def findContacts(fidNode,checked_bipolar):
                 m = pointB[1]-pointA[1]
                 n = pointB[2]-pointA[2]
                 AB = np.array([l,m,n])
+                
                 # select the last point
-                pointE = end_RAS[end_markups.index(letter)]
+                # pointE = end_RAS[end_markups.index(letter)]
+                pointE = pointE = [(abs(coordinate)+30)*np.sign(coordinate) for coordinate in pointB]
                 l = pointE[0]-pointA[0]
                 m = pointE[1]-pointA[1]
                 n = pointE[2]-pointA[2]
@@ -373,9 +375,9 @@ def findContacts(fidNode,checked_bipolar):
                 P = pointA + np.dot(AE,AB) / np.dot(AB,AB) * AB
                 # generate projection on Slicer 
                 fidNodeE.AddControlPoint(P,letter)
+                
                 # add ruler
                 rulerNode = slicer.vtkMRMLAnnotationRulerNode()
-                
                 rulerName = letter
                 if rulerName not in ruler_done_names: 
                     ruler_done_names.append(rulerName)
@@ -400,6 +402,7 @@ def findContacts(fidNode,checked_bipolar):
                 rulerNode.GetDisplayNode().SetMaxTicks(0)
                 rulerNode.SetLocked(True)
         else:
+            
             # compute the vector that defines the line that passes through the last point and the penultimate user-defined markup
             pointA = RAS[index-1]
             pointB = RAS[index]
@@ -407,8 +410,10 @@ def findContacts(fidNode,checked_bipolar):
             m = pointB[1]-pointA[1]
             n = pointB[2]-pointA[2]
             AB = np.array([l,m,n])
+            
             # select the last point
-            pointE = end_RAS[end_markups.index(letter)]
+            # pointE = end_RAS[end_markups.index(letter)]
+            pointE = pointE = [(abs(coordinate)+30)*np.sign(coordinate) for coordinate in pointB]
             l = pointE[0]-pointA[0]
             m = pointE[1]-pointA[1]
             n = pointE[2]-pointA[2]
