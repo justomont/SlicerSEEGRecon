@@ -31,12 +31,11 @@ By leveraging the capabilities of 3D Slicer, SlicerAutoelectrodes allows you to 
 1. Start 3D Slicer.
 2. Load a volume. 
 3. Navigate to Markups > Create Markups > Point List.
-4. Name the point list as real-R (for right hemisphere electrodes) or real-L (for left hemisphere electrodes).
-5. For each electrode, place a point on the first (deepest) contact and the last contact. Important: Both points should start with the same name, indicating the electrode's name. The first point’s name must end in 1, and the last point’s name must end in the total number of contacts that electrode has. For example, for an electrode with 10 contacts placed in the hippocampus, you could name the first point _Hip1_ and the last point _Hip10_.
+4. For each electrode, place a point on the first (deepest) contact and the last contact. Important: Both points should start with the same name, indicating the electrode's name. The first point’s name must end in 1, and the last point’s name must end in the total number of contacts that electrode has. For example, for an electrode with 10 contacts placed in the hippocampus, you could name the first point _Hip1_ and the last point _Hip10_.
     1. If an electrode is bent, add more points at each bending position, specifying the contact number at the bend. For example, if the electrode is bent at the 6th contact, add points Hip1 (first contact), Hip6 (bending contact), and Hip10 (last contact).
-6. Once all points for all electrodes are placed, go to Modules Menu > SEEG > Autoelectrodes.
-7. Select the markup list that contains the contacts.
-8. Click on Apply, and the position of all contacts will appear.
+5. Once all points for all electrodes are placed, go to Modules Menu > SEEG > Autoelectrodes.
+6. Select the markup list that contains the contacts.
+7. Click on Apply, and the position of all contacts will appear.
 
 ## Contributions and Support
 
