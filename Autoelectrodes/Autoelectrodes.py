@@ -146,7 +146,6 @@ def NthFiducialPosition(fidNode,n):
     fidNode.GetNthControlPointPosition(n,pos)
     return pos
 
-
 def findContacts(fidNode,checked_bipolar):
     
     # Get the aseg map
@@ -233,8 +232,13 @@ def findContacts(fidNode,checked_bipolar):
     fidNodeE.SetName(fidNode.GetName()+"_ends")
     slicer.mrmlScene.AddNode(fidNodeE)
     
+    # Initialize variables to store all the electrode lines in the same folder
+    shNode = slicer.mrmlScene.GetSubjectHierarchyNode() # Get hierarychyNode
+    SceneID = shNode.GetSceneItemID() # Get Current SceneID
+    electrodes_folderID = shNode.CreateFolderItem(SceneID, "Electrodes") # Create folder
+    
     # Iterate over all the markups defined by the user
-    ruler_done_names = []
+    line_done_names = []
     for index,markup in enumerate(markups): 
         if index < len(markups)-1: # There's a -1 one here because the penultimate markup adds the last markup, so there is no need to check the last one
         
@@ -326,37 +330,51 @@ def findContacts(fidNode,checked_bipolar):
                     monopolar_RAS_Grey_Matter.append(RAS[index+1])
                     fidNode_Grey_Matter.AddControlPoint(RAS[index+1], letter+str(additions+2))
                 
-                #Create rulers where the whole electrodes are
-                rulerNode = slicer.vtkMRMLAnnotationRulerNode()
+                #Create LineNode to represent the whole electrode up to the last contact
+                lineNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsLineNode")
                 
-                rulerName = letter
-                if rulerName not in ruler_done_names: 
-                    ruler_done_names.append(rulerName)
+                # Check if that electrode has been already done or not
+                lineName = letter
+                if lineName not in line_done_names: 
+                    line_done_names.append(lineName)
+                    lineNode.SetName(letter+"_segment_1")
                 else:
-                    # print("else")
                     i=0
-                    while rulerName in ruler_done_names:
+                    while lineName in line_done_names:
                         i +=1
-                        rulerName = '%s_%i' % (letter, i)
-                    ruler_done_names.append(rulerName)
-                rulerNode.SetName(rulerName)
-                rulerNode.Initialize(slicer.mrmlScene)
-                rulerNode.SetPosition1(RAS[index])
-                rulerNode.SetPosition2(RAS[index+1])
+                        lineName = '%s_%i' % (letter, i)
+                    line_done_names.append(lineName)
+                    lineNode.SetName(letter+"_segment_"+str(i+1))
+                
+                # Create the actual line in the LineNode
+                line_coordinates = np.array([RAS[index],RAS[index+1]])
+                slicer.util.updateMarkupsControlPointsFromArray(lineNode, line_coordinates)
+                
+                # Change color of the line to blue/red according to right/left hemisphere
                 if RAS[index][0] > 0:
-                    rulerNode.GetDisplayNode().SetColor([0/255,85/255,225/255])
+                    lineNode.GetDisplayNode().SetColor([0/255,85/255,225/255])
+                    lineNode.GetDisplayNode().SetSelectedColor([0/255,85/255,225/255])
                 else:
-                    rulerNode.GetDisplayNode().SetColor([170/255,0/255,0/255])
-                rulerNode.SetDistanceAnnotationScale(0)
-                rulerNode.GetDisplayNode().SetLineThickness(6)
-                rulerNode.GetDisplayNode().SetMaxTicks(0)
-                rulerNode.SetLocked(True)
+                    lineNode.GetDisplayNode().SetColor([170/255,0/255,0/255])
+                    lineNode.GetDisplayNode().SetSelectedColor([170/255,0/255,0/255])
+                
+                # Hide text
+                lineNode.GetDisplayNode().SetTextScale(0)
+                # Set glyph scale (reduce almost to none to make it not visible but the line still can be shown)
+                lineNode.GetDisplayNode().SetGlyphScale(0.1)
+                # Set line thickness
+                lineNode.GetDisplayNode().SetLineThickness(15)
+                # Lock the line
+                lineNode.SetLocked(True)
+                
+                # Store the line in the electrodes folder
+                lineNodeID = shNode.GetItemByDataNode(lineNode)
+                shNode.SetItemParent(lineNodeID, electrodes_folderID)
             
-            # if the letter is not the same as the next one it means we found the last markup of the electrode, 
-            # thus we can extend this last section to better grpahically represent the electrode
+            # If the letter is not the same as the next one it means we found the last markup of the electrode, thus we can extend this last section to better graphically represent the electrode
             else:
                 
-                # compute the vector that defines the line that passes through the last point and the penultimate user-defined markup
+                # Compute the vector that defines the line that passes through the last point and the penultimate user-defined markup
                 pointA = RAS[index-1]
                 pointB = RAS[index]
                 l = pointB[0]-pointA[0]
@@ -364,46 +382,62 @@ def findContacts(fidNode,checked_bipolar):
                 n = pointB[2]-pointA[2]
                 AB = np.array([l,m,n])
                 
-                # select the last point
-                # pointE = end_RAS[end_markups.index(letter)]
+                # Select the last point
                 pointE = pointE = [(abs(coordinate)+30)*np.sign(coordinate) for coordinate in pointB]
                 l = pointE[0]-pointA[0]
                 m = pointE[1]-pointA[1]
                 n = pointE[2]-pointA[2]
                 AE = np.array([l,m,n])
-                # project the last markup (E) onto the line generated by AB
+                
+                # Project the last markup (E) onto the line generated by AB
                 P = pointA + np.dot(AE,AB) / np.dot(AB,AB) * AB
-                # generate projection on Slicer 
+                
+                # Generate projection on Slicer 
                 fidNodeE.AddControlPoint(P,letter)
                 
-                # add ruler
-                rulerNode = slicer.vtkMRMLAnnotationRulerNode()
-                rulerName = letter
-                if rulerName not in ruler_done_names: 
-                    ruler_done_names.append(rulerName)
-                else:
-                    # print("else")
-                    i=0
-                    while rulerName in ruler_done_names:
-                        i +=1
-                        rulerName = '%s_%i' % (letter, i)
-                    ruler_done_names.append(rulerName)
-                rulerNode.SetName(rulerName)
-                rulerNode.Initialize(slicer.mrmlScene)
-                rulerNode.SetPosition1(RAS[index])
+                #Create LineNode to represent the whole electrode up to the last contact
+                lineNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsLineNode")
                 
-                rulerNode.SetPosition2(P)
-                if P[0] > 0:
-                    rulerNode.GetDisplayNode().SetColor([0/255,85/255,225/255])
+                # Check if that electrode has been already done or not
+                lineName = letter
+                if lineName not in line_done_names: 
+                    line_done_names.append(lineName)
+                    lineNode.SetName(letter+"_segment_1")
                 else:
-                    rulerNode.GetDisplayNode().SetColor([170/255,0/255,0/255])
-                rulerNode.SetDistanceAnnotationScale(0)
-                rulerNode.GetDisplayNode().SetLineThickness(6)
-                rulerNode.GetDisplayNode().SetMaxTicks(0)
-                rulerNode.SetLocked(True)
+                    i=0
+                    while lineName in line_done_names:
+                        i +=1
+                        lineName = '%s_%i' % (letter, i)
+                    line_done_names.append(lineName)
+                    lineNode.SetName(letter+"_segment_"+str(i+1))
+                
+                # Create the actual line in the LineNode
+                line_coordinates = np.array([RAS[index],P])
+                slicer.util.updateMarkupsControlPointsFromArray(lineNode, line_coordinates)
+                
+                # Change color of the line to blue/red according to right/left hemisphere
+                if P[0] > 0:
+                    lineNode.GetDisplayNode().SetColor([0/255,85/255,225/255])
+                    lineNode.GetDisplayNode().SetSelectedColor([0/255,85/255,225/255])
+                else:
+                    lineNode.GetDisplayNode().SetColor([170/255,0/255,0/255])
+                    lineNode.GetDisplayNode().SetSelectedColor([170/255,0/255,0/255])
+                    
+                # Hide text
+                lineNode.GetDisplayNode().SetTextScale(0)
+                # Set glyph scale (reduce almost to none to make it not visible but the line still can be shown)
+                lineNode.GetDisplayNode().SetGlyphScale(0.1)
+                # Set line thickness
+                lineNode.GetDisplayNode().SetLineThickness(15)
+                # Lock the line
+                lineNode.SetLocked(True)
+                
+                # Store the line in the electrodes folder
+                lineNodeID = shNode.GetItemByDataNode(lineNode)
+                shNode.SetItemParent(lineNodeID, electrodes_folderID)
         else:
             
-            # compute the vector that defines the line that passes through the last point and the penultimate user-defined markup
+            # Compute the vector that defines the line that passes through the last point and the penultimate user-defined markup
             pointA = RAS[index-1]
             pointB = RAS[index]
             l = pointB[0]-pointA[0]
@@ -411,43 +445,59 @@ def findContacts(fidNode,checked_bipolar):
             n = pointB[2]-pointA[2]
             AB = np.array([l,m,n])
             
-            # select the last point
-            # pointE = end_RAS[end_markups.index(letter)]
+            # Select the last point
             pointE = pointE = [(abs(coordinate)+30)*np.sign(coordinate) for coordinate in pointB]
             l = pointE[0]-pointA[0]
             m = pointE[1]-pointA[1]
             n = pointE[2]-pointA[2]
             AE = np.array([l,m,n])
-            # project the last markup (E) onto the line generated by AB
+            
+            # Project the last markup (E) onto the line generated by AB
             P = pointA + np.dot(AE,AB) / np.dot(AB,AB) * AB
-            # generate projection on Slicer 
+            
+            # Generate projection on Slicer 
             fidNodeE.AddControlPoint(P,letter)
-            # add ruler
-            rulerNode = slicer.vtkMRMLAnnotationRulerNode()
             
-            rulerName = letter
-            if rulerName not in ruler_done_names: 
-                ruler_done_names.append(rulerName)
+            #Create LineNode to represent the whole electrode up to the last contact
+            lineNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLMarkupsLineNode")
+            
+            # Check if that electrode has been already done or not
+            lineName = letter
+            if lineName not in line_done_names: 
+                line_done_names.append(lineName)
+                lineNode.SetName(letter+"_segment_1")
             else:
-                # print("else")
                 i=0
-                while rulerName in ruler_done_names:
+                while lineName in line_done_names:
                     i +=1
-                    rulerName = '%s_%i' % (letter, i)
-                ruler_done_names.append(rulerName)
-            rulerNode.SetName(rulerName)
-            rulerNode.Initialize(slicer.mrmlScene)
-            rulerNode.SetPosition1(RAS[index])
+                    lineName = '%s_%i' % (letter, i)
+                line_done_names.append(lineName)
+                lineNode.SetName(letter+"_segment_"+str(i+1))
+                
+            # Create the actual line in the LineNode
+            line_coordinates = np.array([RAS[index],P])
+            slicer.util.updateMarkupsControlPointsFromArray(lineNode, line_coordinates)
             
-            rulerNode.SetPosition2(P)
+            # Change color of the line to blue/red according to right/left hemisphere
             if P[0] > 0:
-                rulerNode.GetDisplayNode().SetColor([0/255,85/255,225/255])
+                lineNode.GetDisplayNode().SetColor([0/255,85/255,225/255])
+                lineNode.GetDisplayNode().SetSelectedColor([0/255,85/255,225/255])
             else:
-                rulerNode.GetDisplayNode().SetColor([170/255,0/255,0/255])
-            rulerNode.SetDistanceAnnotationScale(0)
-            rulerNode.GetDisplayNode().SetLineThickness(6)
-            rulerNode.GetDisplayNode().SetMaxTicks(0)
-            rulerNode.SetLocked(True)
+                lineNode.GetDisplayNode().SetColor([170/255,0/255,0/255])
+                lineNode.GetDisplayNode().SetSelectedColor([170/255,0/255,0/255])
+            
+            # Hide text
+            lineNode.GetDisplayNode().SetTextScale(0)
+            # Set glyph scale (reduce almost to none to make it not visible but the line still can be shown)
+            lineNode.GetDisplayNode().SetGlyphScale(0.1)
+            # Set line thickness
+            lineNode.GetDisplayNode().SetLineThickness(15)
+            # Lock the line
+            lineNode.SetLocked(True)
+            
+            # Store the line in the electrodes folder
+            lineNodeID = shNode.GetItemByDataNode(lineNode)
+            shNode.SetItemParent(lineNodeID, electrodes_folderID)
             
     # Count the number of contacts on each of the different locations (White Matter/Grey Matter/Outside)
     number_nodes_White_Matter = len(monopolar_markups_White_Matter)
