@@ -146,6 +146,18 @@ def NthFiducialPosition(fidNode,n):
     fidNode.GetNthControlPointPosition(n,pos)
     return pos
 
+def computeBrainVolume(brainModelNode):
+    
+    mesh = brainModelNode.GetMesh()
+    mass = vtk.vtkMassProperties()
+    mass.SetInputData(mesh)
+    mass.Update()
+    
+    # Obtain the volume in cm^3
+    brain_volume = mass.GetVolume()/1000 # The /1000 is to convert from mm^3 which is the default
+    
+    return brain_volume
+
 def findContacts(fidNode,checked_bipolar):
     
     # Get the aseg map
@@ -499,13 +511,43 @@ def findContacts(fidNode,checked_bipolar):
             lineNodeID = shNode.GetItemByDataNode(lineNode)
             shNode.SetItemParent(lineNodeID, electrodes_folderID)
             
-    # Count the number of contacts on each of the different locations (White Matter/Grey Matter/Outside)
-    number_nodes_White_Matter = len(monopolar_markups_White_Matter)
-    number_nodes_Grey_Matter = len(monopolar_markups_Grey_Matter)
-    number_nodes_outside_brain = len(monopolar_markups_outside_brain)
+    # Count the number of contacts on White Matter
+    monopolar_number_nodes_White_Matter = len(monopolar_markups_White_Matter)
+    monopolar_number_nodes_White_Matter_Right = len([1 for RAScoord in monopolar_RAS_White_Matter if RAScoord[0] > 0])
+    monopolar_number_nodes_White_Matter_Left = monopolar_number_nodes_White_Matter - monopolar_number_nodes_White_Matter_Right
     
-    print("\nNUMBER OF CONTACTS: \nWhite Matter: {} \nGrey Matter: {} \nOutside of brain: {}".format(number_nodes_White_Matter, number_nodes_Grey_Matter, number_nodes_outside_brain))
+    # Count the number of contacts on Grey Matter
+    monopolar_number_nodes_Grey_Matter = len(monopolar_markups_Grey_Matter)
+    monopolar_number_nodes_Grey_Matter_Right = len([1 for RAScoord in monopolar_RAS_Grey_Matter if RAScoord[0] > 0])
+    monopolar_number_nodes_Grey_Matter_Left = monopolar_number_nodes_Grey_Matter - monopolar_number_nodes_Grey_Matter_Right
     
+    # Count the number of contacts outside brain
+    monopolar_number_nodes_outside_brain = len(monopolar_markups_outside_brain)
+    monopolar_number_nodes_outside_brain_Right = len([1 for RAScoord in monopolar_RAS_outside_brain if RAScoord[0] > 0])
+    monopolar_number_nodes_outside_brain_Left = monopolar_number_nodes_outside_brain - monopolar_number_nodes_outside_brain_Right
+
+    # Obtain volume of the hemispheres 
+    right_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('rhp')
+    right_hemisphere_Volume = computeBrainVolume(right_hemisphere_VolumeNode)
+    left_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('lhp')
+    left_hemisphere_Volume = computeBrainVolume(left_hemisphere_VolumeNode)
+    brain_Volume = right_hemisphere_Volume + left_hemisphere_Volume
+    
+    # Dictionary to store all the values
+    global monopolar_counted_nodes_Dict
+    monopolar_counted_nodes_Dict = {"WhiteMatter_Right": monopolar_number_nodes_White_Matter_Right,
+                                    "WhiteMatter_Left": monopolar_number_nodes_White_Matter_Left,
+                                    "WhiteMatter": monopolar_number_nodes_White_Matter,
+                                    "GreyMatter_Right": monopolar_number_nodes_Grey_Matter_Right,
+                                    "GreyMatter_Left": monopolar_number_nodes_Grey_Matter_Left,
+                                    "GreyMatter": monopolar_number_nodes_Grey_Matter,
+                                    "Outside_Right": monopolar_number_nodes_outside_brain_Right,
+                                    "Outside_Left": monopolar_number_nodes_outside_brain_Left,
+                                    "Outside": monopolar_number_nodes_outside_brain,
+                                    "BrainVolume_Right": right_hemisphere_Volume,
+                                    "BrainVolume_Left": left_hemisphere_Volume,
+                                    "BrainVolume": brain_Volume}
+        
     # Lock and select all markups
     for markupN in range(fidNode.GetNumberOfControlPoints()):
         fidNode.SetNthControlPointLocked(markupN,True) # Lock 
@@ -678,19 +720,39 @@ def findContacts(fidNode,checked_bipolar):
         fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetGlyphScale(3)
         fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetTextScale(0)
         
+        # Count the number of contacts on White Matter
+        bipolar_number_nodes_White_Matter = len(bipolar_markups_White_Matter)
+        bipolar_number_nodes_White_Matter_Right = len([1 for RAScoord in bipolar_RAS_White_Matter if RAScoord[0] > 0])
+        bipolar_number_nodes_White_Matter_Left = bipolar_number_nodes_White_Matter - bipolar_number_nodes_White_Matter_Right
+        
+        # Count the number of contacts on Grey Matter
+        bipolar_number_nodes_Grey_Matter = len(bipolar_markups_Grey_Matter)
+        bipolar_number_nodes_Grey_Matter_Right = len([1 for RAScoord in bipolar_RAS_Grey_Matter if RAScoord[0] > 0])
+        bipolar_number_nodes_Grey_Matter_Left = bipolar_number_nodes_Grey_Matter - bipolar_number_nodes_Grey_Matter_Right
+        
+        # Count the number of contacts outside brain
+        bipolar_number_nodes_outside_brain = len(bipolar_markups_outside_brain)
+        bipolar_number_nodes_outside_brain_Right = len([1 for RAScoord in bipolar_RAS_outside_brain if RAScoord[0] > 0])
+        bipolar_number_nodes_outside_brain_Left = bipolar_number_nodes_outside_brain - bipolar_number_nodes_outside_brain_Right
+        
+        # Dictionary to store all the values
+        global bipolar_counted_nodes_Dict
+        bipolar_counted_nodes_Dict = {"WhiteMatter_Right": bipolar_number_nodes_White_Matter_Right,
+                                        "WhiteMatter_Left": bipolar_number_nodes_White_Matter_Left,
+                                        "WhiteMatter": bipolar_number_nodes_White_Matter,
+                                        "GreyMatter_Right": bipolar_number_nodes_Grey_Matter_Right,
+                                        "GreyMatter_Left": bipolar_number_nodes_Grey_Matter_Left,
+                                        "GreyMatter": bipolar_number_nodes_Grey_Matter,
+                                        "Outside_Right": bipolar_number_nodes_outside_brain_Right,
+                                        "Outside_Left": bipolar_number_nodes_outside_brain_Left,
+                                        "Outside": bipolar_number_nodes_outside_brain,
+                                        "BrainVolume_Right": right_hemisphere_Volume,
+                                        "BrainVolume_Left": left_hemisphere_Volume,
+                                        "BrainVolume": brain_Volume}
+        
         logging.info("Bipolar contact placement complete.\n") 
 
-def computeBrainVolume(brainModelNode):
-    
-    mesh = brainModelNode.GetMesh()
-    mass = vtk.vtkMassProperties()
-    mass.SetInputData(mesh)
-    mass.Update()
-    
-    # Obtain the volume in cm^3
-    brain_volume = mass.GetVolume()/1000 # The /1000 is to convert from mm^3 which is the default
-    
-    return brain_volume
+
         
 def registerMNI(fixedVolumeNode):
     global mniPath, linearTransformNode
@@ -961,6 +1023,7 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # These connections ensure that whenever user changes some settings on the GUI, that is saved in the MRML scene
         # (in the selected parameter node).
         self.ui.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.electrodesSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         self.ui.fixedVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         self.ui.checkBox_bipolar.connect("toggled(bool)", self.updateParameterNodeFromGUI)
         self.ui.inputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
@@ -968,7 +1031,6 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.checkBox_transfer.connect("toggled(bool)", self.updateParameterNodeFromGUI)
         self.ui.DirectoryButton.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
         self.ui.DirectoryButton_subject.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
-        self.ui.SceneName.connect("textChanged(QString)", self.updateParameterNodeFromGUI)
         
         # Buttons
         self.ui.applyButton.connect('clicked(bool)', self.onApplyButton)
@@ -1066,6 +1128,7 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Update node selectors and sliders
         self.ui.inputSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
+        self.ui.electrodesSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
         self.ui.fixedVolumeSelector.setCurrentNode(self._parameterNode.GetNodeReference("fixedVolume"))
         self.ui.checkBox_bipolar.checked = (self._parameterNode.GetParameter("Bipolar") == "true")
         self.ui.checkBox_transfer.checked = (self._parameterNode.GetParameter("Transfer") == "false")
@@ -1073,7 +1136,6 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.outputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputListVolume"))
         self.ui.DirectoryButton.directory = str(self._parameterNode.GetParameter("Directory"))
         self.ui.DirectoryButton_subject.directory = str(self._parameterNode.GetParameter("Directory_Subject"))
-        self.ui.SceneName.text = str(self._parameterNode.GetParameter("SceneName"))
 
         # Update buttons states and tooltips
         if self._parameterNode.GetNodeReference("InputVolume"):
@@ -1082,6 +1144,14 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         else:
             self.ui.applyButton.toolTip = "Select input volume node"
             self.ui.applyButton.enabled = False
+            
+        # Update buttons states and tooltips
+        if self._parameterNode.GetNodeReference("InputVolume"):
+            self.ui.saveButton.toolTip = "Generate table"
+            self.ui.saveButton.enabled = True
+        else:
+            self.ui.saveButton.toolTip = "Select input"
+            self.ui.saveButton.enabled = False
 
         # All the GUI updates are done
         self._updatingGUIFromParameterNode = False
@@ -1098,12 +1168,12 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         wasModified = self._parameterNode.StartModify()  # Modify all properties in a single batch
 
         self._parameterNode.SetNodeReferenceID("InputVolume", self.ui.inputSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("InputVolume", self.ui.electrodesSelector.currentNodeID)
         self._parameterNode.SetNodeReferenceID("fixedVolume", self.ui.fixedVolumeSelector.currentNodeID)
         self._parameterNode.SetNodeReferenceID("InputListVolume", self.ui.inputListSelector.currentNodeID)
         self._parameterNode.SetNodeReferenceID("OutputListVolume", self.ui.outputListSelector.currentNodeID)
         self._parameterNode.SetParameter("Directory", str(self.ui.DirectoryButton.directory))
         self._parameterNode.SetParameter("Directory_Subject", str(self.ui.DirectoryButton_subject.directory))
-        self._parameterNode.SetParameter("SceneName", str(self.ui.SceneName.text))
         self._parameterNode.SetParameter("Bipolar", "true" if self.ui.checkBox_bipolar.checked else "false")
         self._parameterNode.SetParameter("Transfer", "true" if self.ui.checkBox_transfer.checked else "false")
 
@@ -1143,9 +1213,10 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     def onSaveButton(self):
         
         destinyDirectory = self.ui.DirectoryButton_subject.directory
-        sceneName = self.ui.SceneName.text
+        electrodesNode = self.ui.electrodesSelector.currentNode()        
+        
         # print(sceneName)
-        self.logic.save_info(destinyDirectory,sceneName)
+        self.logic.save_info(destinyDirectory, electrodesNode)
         
     def onCopyButton(self):
         
@@ -1242,82 +1313,182 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
                     if markup_name == og_markup_name:
                         inputList.RemoveNthControlPoint(index)
     
-    def save_info(self,destinationDirectory,sceneName):
+    def save_info(self,destinationDirectory, fidNode):
         
-        if slicer.util.saveScene(destinationDirectory+"/"+sceneName+".mrml"):
-          logging.info("All files saved to: {0}".format(destinationDirectory))
-          
-          os.makedirs(destinationDirectory+"/res/", exist_ok=True)
-          os.makedirs(destinationDirectory+"/note/", exist_ok=True)
-          os.makedirs(destinationDirectory+"/edit/", exist_ok=True)
-          
-          # Save the view from the 3D view
-          viewNodeID = "vtkMRMLViewNode1"
-          import ScreenCapture
-          cap = ScreenCapture.ScreenCaptureLogic()
-          view = cap.viewFromNode(slicer.mrmlScene.GetNodeByID(viewNodeID))
-          view.mrmlViewNode().SetBackgroundColor(1,1,1)
-          view.mrmlViewNode().SetBackgroundColor2(1,1,1)
-          view.mrmlViewNode().SetAxisLabelsVisible(False)
-          view.mrmlViewNode().SetBoxVisible(False)
-          view.resetFocalPoint()
-          cap.captureImageFromView(view, destinationDirectory+"/"+sceneName+".png")
-          
-          # Save all the elements of the scene
-          childIds = vtk.vtkIdList()
-          shNode = slicer.vtkMRMLSubjectHierarchyNode.GetSubjectHierarchyNode(slicer.mrmlScene)
-          shNode.GetItemChildren(shNode.GetSceneItemID(), childIds) 
-          
-          for itemIdIndex in range(childIds.GetNumberOfIds()):
-              shItemId = childIds.GetId(itemIdIndex)
-              # Write node to file (if storable)
-              dataNode = shNode.GetItemDataNode(shItemId)
-              if dataNode and dataNode.IsA("vtkMRMLStorableNode") and dataNode.GetStorageNode():
-                  # storageNode = dataNode.GetStorageNode()
-                  # filename = os.path.basename(storageNode.GetFileName())
-                  if dataNode.IsA("vtkMRMLScalarVolumeNode") or dataNode.IsA("vtkMRMLLabelMapVolumeNode"):
-                      filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".nrrd"
-                      dataNode.GetStorageNode().SetFileName(filepath)
-                      slicer.util.exportNode(dataNode, filepath)
-                  if dataNode.IsA("vtkMRMLModelNode"):
-                      filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".vtk"
-                      dataNode.GetStorageNode().SetFileName(filepath)
-                      slicer.util.saveNode(dataNode, filepath)
-                  if dataNode.IsA("vtkMRMLMarkupsFiducialNode"):
-                      filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".fcsv"
-                      dataNode.GetStorageNode().SetFileName(filepath)
-                      slicer.util.saveNode(dataNode, filepath)
-                  if dataNode.IsA("vtkMRMLAnnotationRulerNode"):
-                      filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".acsv"
-                      dataNode.GetStorageNode().SetFileName(filepath)
-                      slicer.util.saveNode(dataNode, filepath)
-              elif (dataNode and dataNode.IsA("vtkMRMLStorableNode") and not dataNode.GetStorageNode()):
-                  dataNode.AddDefaultStorageNode()
-                  if dataNode.IsA("vtkMRMLScalarVolumeNode") or dataNode.IsA("vtkMRMLLabelMapVolumeNode"):
-                      filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".nrrd"
-                      dataNode.GetStorageNode().SetFileName(filepath) 
-                      slicer.util.exportNode(dataNode, filepath)
-                  if dataNode.IsA("vtkMRMLModelNode"):
-                      filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".vtk"
-                      dataNode.GetStorageNode().SetFileName(filepath) 
-                      slicer.util.saveNode(dataNode, filepath)
-                  if dataNode.IsA("vtkMRMLMarkupsFiducialNode"):
-                      filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".fcsv"
-                      dataNode.GetStorageNode().SetFileName(filepath) 
-                      slicer.util.saveNode(dataNode, filepath)
-                  if dataNode.IsA("vtkMRMLAnnotationRulerNode"):
-                      filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".acsv"
-                      dataNode.GetStorageNode().SetFileName(filepath) 
-                      slicer.util.saveNode(dataNode, filepath)     
-                    # if dataNode.IsA("vtkMRMLLinearTransformNode"):
-                    #     filepath = destinationDirectory + "/edit/" + dataNode.GetName() + ".h5"
-                    #     dataNode.GetStorageNode().SetFileName(filepath) 
-                    #     slicer.util.saveNode(dataNode, filepath)    
-          
-          slicer.util.saveScene(destinationDirectory+"/"+sceneName+".mrml")
+        global asegVolumeNode, asegVoxelArray
+        asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
+        asegVoxelArray = slicer.util.arrayFromVolume(asegVolumeNode)
+        
+        # All markup's names and positions in RAS coordinates
+        markup_names = [fidNode.GetNthControlPointLabel(i) for i in range(fidNode.GetNumberOfControlPoints())]
+        markup_RAS = [NthFiducialPosition(fidNode,i) for i in range(fidNode.GetNumberOfControlPoints())]
+        
+        # Remove markups that signal the END of the electrode (wich is not the last contact but the tip of the elctrode, outside of the skull)
+        boolean = [has_numbers(name) for name in markup_names]
+        clean_markup_names = list(compress(markup_names, boolean))
+        clean_markup_RAS = list(compress(markup_RAS, boolean))
+        
+        # Sort the lists alphabetically
+        tuples = zip(*sorted(zip(clean_markup_names, clean_markup_RAS)))
+        mu, RAS = [list(tuple) for tuple in  tuples]
+        markups = ["{}{:0>2.0f}".format(''.join([i for i in markup if not i.isdigit()]),int(re.search(r'\d+', markup).group()))  for markup in mu]
+        markups = zip(*sorted(zip(markups,RAS), key=lambda item: (int(item.partition(' ')[0]) if item[0].isdigit() else float('inf'), item)))
+        markups, RAS = [list(tuple) for tuple in  markups]
+        
+        # Initialize the variables where the WHITE matter nodes will be stored
+        markups_White_Matter = []
+        RAS_White_Matter = []
+        
+        # Initialize the variables where the GREY matter nodes will be stored
+        markups_Grey_Matter = []
+        RAS_Grey_Matter = []
+        
+        # Initialize the variables where the nodes OUTSIDE of the brain will be stored
+        markups_outside_brain = []
+        RAS_outside_brain = []
+        
+        for index,markup in enumerate(markups): 
             
-        else:
-          logging.error("Files saving failed")
+            # IJK and real anatomic location of that 1st contact (White Matter/Grey Matter/Outside)
+            ijk_position = RAStoIJK(RAS[index], asegVolumeNode)
+            anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
+            
+            # Store the node in the corresponding volume
+            if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
+                markups_White_Matter.append(markup)
+                RAS_White_Matter.append(RAS[index])
+            elif "Unknown" in anatomic_position:
+                markups_outside_brain.append(markup)
+                RAS_outside_brain.append(RAS[index])
+            else:
+                markups_Grey_Matter.append(markup)
+                RAS_Grey_Matter.append(RAS[index])
+                
+            
+        # Count the number of contacts on White Matter
+        number_nodes_White_Matter = len(markups_White_Matter)
+        number_nodes_White_Matter_Right = len([1 for RAScoord in RAS_White_Matter if RAScoord[0] > 0])
+        number_nodes_White_Matter_Left = number_nodes_White_Matter - number_nodes_White_Matter_Right
+        
+        # Count the number of contacts on Grey Matter
+        number_nodes_Grey_Matter = len(markups_Grey_Matter)
+        number_nodes_Grey_Matter_Right = len([1 for RAScoord in RAS_Grey_Matter if RAScoord[0] > 0])
+        number_nodes_Grey_Matter_Left = number_nodes_Grey_Matter - number_nodes_Grey_Matter_Right
+        
+        # Count the number of contacts outside brain
+        number_nodes_outside_brain = len(markups_outside_brain)
+        number_nodes_outside_brain_Right = len([1 for RAScoord in RAS_outside_brain if RAScoord[0] > 0])
+        number_nodes_outside_brain_Left = number_nodes_outside_brain - number_nodes_outside_brain_Right
+
+        # Obtain volume of the hemispheres 
+        right_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('rhp')
+        right_hemisphere_Volume = computeBrainVolume(right_hemisphere_VolumeNode)
+        left_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('lhp')
+        left_hemisphere_Volume = computeBrainVolume(left_hemisphere_VolumeNode)
+        brain_Volume = right_hemisphere_Volume + left_hemisphere_Volume
+        
+        # Dictionary to store all the values
+        global monopolar_counted_nodes_Dict
+        monopolar_counted_nodes_Dict = {"WhiteMatter_Right": number_nodes_White_Matter_Right,
+                                        "WhiteMatter_Left": number_nodes_White_Matter_Left,
+                                        "WhiteMatter": number_nodes_White_Matter,
+                                        "GreyMatter_Right": number_nodes_Grey_Matter_Right,
+                                        "GreyMatter_Left": number_nodes_Grey_Matter_Left,
+                                        "GreyMatter": number_nodes_Grey_Matter,
+                                        "Outside_Right": number_nodes_outside_brain_Right,
+                                        "Outside_Left": number_nodes_outside_brain_Left,
+                                        "Outside": number_nodes_outside_brain,
+                                        "BrainVolume_Right": right_hemisphere_Volume,
+                                        "BrainVolume_Left": left_hemisphere_Volume,
+                                        "BrainVolume": brain_Volume}
+            
+        try:
+            # Save dictionary of  nodes
+            with open(destinationDirectory+"/"+"electrodes_count_"+fidNode.GetName()+".csv", "w", newline="") as f:
+                w = csv.DictWriter(f, monopolar_counted_nodes_Dict.keys())
+                w.writeheader()
+                w.writerow(monopolar_counted_nodes_Dict)
+            
+            print("Electrode placement info saved!")
+                
+        except:
+            logging.error("Saving failed")
+            
+        
+        # if slicer.util.saveScene(destinationDirectory+"/"+sceneName+".mrml"):
+        #   logging.info("File saved to: {0}".format(destinationDirectory))
+          
+        #   os.makedirs(destinationDirectory+"/res/", exist_ok=True)
+        #   os.makedirs(destinationDirectory+"/note/", exist_ok=True)
+        #   os.makedirs(destinationDirectory+"/edit/", exist_ok=True)
+          
+        #   # Save the view from the 3D view
+        #   viewNodeID = "vtkMRMLViewNode1"
+        #   import ScreenCapture
+        #   cap = ScreenCapture.ScreenCaptureLogic()
+        #   view = cap.viewFromNode(slicer.mrmlScene.GetNodeByID(viewNodeID))
+        #   view.mrmlViewNode().SetBackgroundColor(1,1,1)
+        #   view.mrmlViewNode().SetBackgroundColor2(1,1,1)
+        #   view.mrmlViewNode().SetAxisLabelsVisible(False)
+        #   view.mrmlViewNode().SetBoxVisible(False)
+        #   view.resetFocalPoint()
+        #   cap.captureImageFromView(view, destinationDirectory+"/"+sceneName+".png")
+          
+        #   # Save all the elements of the scene
+        #   childIds = vtk.vtkIdList()
+        #   shNode = slicer.vtkMRMLSubjectHierarchyNode.GetSubjectHierarchyNode(slicer.mrmlScene)
+        #   shNode.GetItemChildren(shNode.GetSceneItemID(), childIds) 
+          
+        #   for itemIdIndex in range(childIds.GetNumberOfIds()):
+        #       shItemId = childIds.GetId(itemIdIndex)
+        #       # Write node to file (if storable)
+        #       dataNode = shNode.GetItemDataNode(shItemId)
+        #       if dataNode and dataNode.IsA("vtkMRMLStorableNode") and dataNode.GetStorageNode():
+        #           # storageNode = dataNode.GetStorageNode()
+        #           # filename = os.path.basename(storageNode.GetFileName())
+        #           if dataNode.IsA("vtkMRMLScalarVolumeNode") or dataNode.IsA("vtkMRMLLabelMapVolumeNode"):
+        #               filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".nrrd"
+        #               dataNode.GetStorageNode().SetFileName(filepath)
+        #               slicer.util.exportNode(dataNode, filepath)
+        #           if dataNode.IsA("vtkMRMLModelNode"):
+        #               filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".vtk"
+        #               dataNode.GetStorageNode().SetFileName(filepath)
+        #               slicer.util.saveNode(dataNode, filepath)
+        #           if dataNode.IsA("vtkMRMLMarkupsFiducialNode"):
+        #               filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".fcsv"
+        #               dataNode.GetStorageNode().SetFileName(filepath)
+        #               slicer.util.saveNode(dataNode, filepath)
+        #           if dataNode.IsA("vtkMRMLAnnotationRulerNode"):
+        #               filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".acsv"
+        #               dataNode.GetStorageNode().SetFileName(filepath)
+        #               slicer.util.saveNode(dataNode, filepath)
+        #       elif (dataNode and dataNode.IsA("vtkMRMLStorableNode") and not dataNode.GetStorageNode()):
+        #           dataNode.AddDefaultStorageNode()
+        #           if dataNode.IsA("vtkMRMLScalarVolumeNode") or dataNode.IsA("vtkMRMLLabelMapVolumeNode"):
+        #               filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".nrrd"
+        #               dataNode.GetStorageNode().SetFileName(filepath) 
+        #               slicer.util.exportNode(dataNode, filepath)
+        #           if dataNode.IsA("vtkMRMLModelNode"):
+        #               filepath = destinationDirectory + "/res/" + dataNode.GetName() + ".vtk"
+        #               dataNode.GetStorageNode().SetFileName(filepath) 
+        #               slicer.util.saveNode(dataNode, filepath)
+        #           if dataNode.IsA("vtkMRMLMarkupsFiducialNode"):
+        #               filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".fcsv"
+        #               dataNode.GetStorageNode().SetFileName(filepath) 
+        #               slicer.util.saveNode(dataNode, filepath)
+        #           if dataNode.IsA("vtkMRMLAnnotationRulerNode"):
+        #               filepath = destinationDirectory + "/note/" + dataNode.GetName() + ".acsv"
+        #               dataNode.GetStorageNode().SetFileName(filepath) 
+        #               slicer.util.saveNode(dataNode, filepath)     
+        #             # if dataNode.IsA("vtkMRMLLinearTransformNode"):
+        #             #     filepath = destinationDirectory + "/edit/" + dataNode.GetName() + ".h5"
+        #             #     dataNode.GetStorageNode().SetFileName(filepath) 
+        #             #     slicer.util.saveNode(dataNode, filepath)    
+          
+        #   slicer.util.saveScene(destinationDirectory+"/"+sceneName+".mrml")
+            
+        # else:
+        #   logging.error("Files saving failed")
         
 
 #
