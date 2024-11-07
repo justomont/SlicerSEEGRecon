@@ -158,7 +158,7 @@ def computeBrainVolume(brainModelNode):
     
     return brain_volume
 
-def findContacts(fidNode,checked_bipolar):
+def findContacts(fidNode):
     
     # Get the aseg map
     global asegVolumeNode, asegVoxelArray
@@ -610,147 +610,144 @@ def findContacts(fidNode,checked_bipolar):
     ###########
     # BIPOLAR #
     ###########
+        
+    # Initialize the variables where the BIPOLAR referenced nodes will be stored (This location is not real, just a representacion of where the re-referenced source would be)
+    fidNode_Bipolar = slicer.vtkMRMLMarkupsFiducialNode()
+    fidNode_Bipolar.SetName("Bipolar_"+fidNode.GetName())
+    slicer.mrmlScene.AddNode(fidNode_Bipolar)
+    bipolar_markups = []
+    bipolar_RAS = []
     
-    # If the user specified that they want the bipolar representation
-    if checked_bipolar: 
-        
-        # Initialize the variables where the BIPOLAR referenced nodes will be stored (This location is not real, just a representacion of where the re-referenced source would be)
-        fidNode_Bipolar = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNode_Bipolar.SetName("Bipolar_"+fidNode.GetName())
-        slicer.mrmlScene.AddNode(fidNode_Bipolar)
-        bipolar_markups = []
-        bipolar_RAS = []
-        
-        # Initialize the variables where the BIPOLAR WHITE matter nodes will be stored
-        fidNode_Bipolar_White_Matter = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNode_Bipolar_White_Matter.SetName("Bipolar_"+fidNode.GetName()+"_White_Matter")
-        slicer.mrmlScene.AddNode(fidNode_Bipolar_White_Matter)
-        bipolar_markups_White_Matter = []
-        bipolar_RAS_White_Matter = []
-        
-        # Initialize the variables where the BIPOLAR GREY matter nodes will be stored
-        fidNode_Bipolar_Grey_Matter = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNode_Bipolar_Grey_Matter.SetName("Bipolar_"+fidNode.GetName()+"_Grey_Matter")
-        slicer.mrmlScene.AddNode(fidNode_Bipolar_Grey_Matter)
-        bipolar_markups_Grey_Matter = []
-        bipolar_RAS_Grey_Matter = []
-        
-        # Initialize the variables where the BIPOLAR nodes OUTSIDE of the brain will be stored
-        fidNode_Bipolar_outside_brain = slicer.vtkMRMLMarkupsFiducialNode()
-        fidNode_Bipolar_outside_brain.SetName("Bipolar_"+fidNode.GetName()+"_Outside")
-        slicer.mrmlScene.AddNode(fidNode_Bipolar_outside_brain)
-        bipolar_markups_outside_brain = []
-        bipolar_RAS_outside_brain = []
-        
-        for index,markup in enumerate(monopolar_markups):
-            if index < len(monopolar_markups)-1:
-                
-                letter = ''.join([i for i in markup if not i.isdigit()])
-                digit = int(re.search(r'\d+', markup).group())
-                next_letter = ''.join([i for i in monopolar_markups[index+1] if not i.isdigit()])
-                next_digit = int(re.search(r'\d+', monopolar_markups[index+1]).group())
-                                
-                if letter == next_letter:
-                    middle_point = np.add(monopolar_RAS[index+1], monopolar_RAS[index])/2
-                    bi_tag = "-".join([letter+str(digit),monopolar_markups[index+1]])
-                    bipolar_markups.append(bi_tag)
-                    bipolar_RAS.append(middle_point)
-                    
-                    fidNode_Bipolar.AddControlPoint(middle_point, bi_tag)
-                    
-                    # IJK and real anatomic location of the contact (White Matter/Grey Matter/Outside)
-                    ijk_position = RAStoIJK(middle_point, asegVolumeNode)
-                    anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
-                    
-                    # Store the node in the corresponding volume
-                    if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
-                        bipolar_markups_White_Matter.append(bi_tag)
-                        bipolar_RAS_White_Matter.append(middle_point)
-                        fidNode_Bipolar_White_Matter.AddControlPoint(middle_point, bi_tag)
-                    elif "Unknown" in anatomic_position:
-                        bipolar_markups_outside_brain.append(bi_tag)
-                        bipolar_RAS_outside_brain.append(middle_point)
-                        fidNode_Bipolar_outside_brain.AddControlPoint(middle_point, bi_tag)
-                    else:
-                        bipolar_markups_Grey_Matter.append(bi_tag)
-                        bipolar_RAS_Grey_Matter.append(middle_point)
-                        fidNode_Bipolar_Grey_Matter.AddControlPoint(middle_point, bi_tag)
-                    
-        # Lock all markups
-        for markupN in range(fidNode_Bipolar.GetNumberOfControlPoints()):
-            fidNode_Bipolar.SetNthControlPointLocked(markupN,True)
-            fidNode_Bipolar.SetNthControlPointSelected(markupN,0)
-        for markupN in range(fidNode_Bipolar_White_Matter.GetNumberOfControlPoints()):
-            fidNode_Bipolar_White_Matter.SetNthControlPointLocked(markupN,True)
-            fidNode_Bipolar_White_Matter.SetNthControlPointSelected(markupN,0)
-        for markupN in range(fidNode_Bipolar_Grey_Matter.GetNumberOfControlPoints()):
-            fidNode_Bipolar_Grey_Matter.SetNthControlPointLocked(markupN,True)
-            fidNode_Bipolar_Grey_Matter.SetNthControlPointSelected(markupN,0)
-        
-        if P[0] > 0:
-            # SELECTED color for the right hemisphere
-            fidNode_Bipolar.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
-            fidNode_Bipolar_White_Matter.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
-            fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
-            # UNselected
-            fidNode_Bipolar.GetDisplayNode().SetColor([0/255,0/255,0/255])
-            fidNode_Bipolar_White_Matter.GetDisplayNode().SetColor([0/255,0/255,0/255])
-            fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetColor([0/255,0/255,0/255])
+    # Initialize the variables where the BIPOLAR WHITE matter nodes will be stored
+    fidNode_Bipolar_White_Matter = slicer.vtkMRMLMarkupsFiducialNode()
+    fidNode_Bipolar_White_Matter.SetName("Bipolar_"+fidNode.GetName()+"_White_Matter")
+    slicer.mrmlScene.AddNode(fidNode_Bipolar_White_Matter)
+    bipolar_markups_White_Matter = []
+    bipolar_RAS_White_Matter = []
+    
+    # Initialize the variables where the BIPOLAR GREY matter nodes will be stored
+    fidNode_Bipolar_Grey_Matter = slicer.vtkMRMLMarkupsFiducialNode()
+    fidNode_Bipolar_Grey_Matter.SetName("Bipolar_"+fidNode.GetName()+"_Grey_Matter")
+    slicer.mrmlScene.AddNode(fidNode_Bipolar_Grey_Matter)
+    bipolar_markups_Grey_Matter = []
+    bipolar_RAS_Grey_Matter = []
+    
+    # Initialize the variables where the BIPOLAR nodes OUTSIDE of the brain will be stored
+    fidNode_Bipolar_outside_brain = slicer.vtkMRMLMarkupsFiducialNode()
+    fidNode_Bipolar_outside_brain.SetName("Bipolar_"+fidNode.GetName()+"_Outside")
+    slicer.mrmlScene.AddNode(fidNode_Bipolar_outside_brain)
+    bipolar_markups_outside_brain = []
+    bipolar_RAS_outside_brain = []
+    
+    for index,markup in enumerate(monopolar_markups):
+        if index < len(monopolar_markups)-1:
             
-        else:
-            # Selected
-            fidNode_Bipolar.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
-            fidNode_Bipolar_White_Matter.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
-            fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
-            # Unselected
-            fidNode_Bipolar.GetDisplayNode().SetColor([0/255,0/255,0/255])
-            fidNode_Bipolar_White_Matter.GetDisplayNode().SetColor([0/255,0/255,0/255])
-            fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetColor([0/255,0/255,0/255])
+            letter = ''.join([i for i in markup if not i.isdigit()])
+            digit = int(re.search(r'\d+', markup).group())
+            next_letter = ''.join([i for i in monopolar_markups[index+1] if not i.isdigit()])
+            next_digit = int(re.search(r'\d+', monopolar_markups[index+1]).group())
+                            
+            if letter == next_letter:
+                middle_point = np.add(monopolar_RAS[index+1], monopolar_RAS[index])/2
+                bi_tag = "-".join([letter+str(digit),monopolar_markups[index+1]])
+                bipolar_markups.append(bi_tag)
+                bipolar_RAS.append(middle_point)
+                
+                fidNode_Bipolar.AddControlPoint(middle_point, bi_tag)
+                
+                # IJK and real anatomic location of the contact (White Matter/Grey Matter/Outside)
+                ijk_position = RAStoIJK(middle_point, asegVolumeNode)
+                anatomic_position = anatomicREL(asegVoxelArray[ijk_position[2],ijk_position[1],ijk_position[0]])
+                
+                # Store the node in the corresponding volume
+                if ("White" in anatomic_position) or ("WM-hypointensities" in anatomic_position):
+                    bipolar_markups_White_Matter.append(bi_tag)
+                    bipolar_RAS_White_Matter.append(middle_point)
+                    fidNode_Bipolar_White_Matter.AddControlPoint(middle_point, bi_tag)
+                elif "Unknown" in anatomic_position:
+                    bipolar_markups_outside_brain.append(bi_tag)
+                    bipolar_RAS_outside_brain.append(middle_point)
+                    fidNode_Bipolar_outside_brain.AddControlPoint(middle_point, bi_tag)
+                else:
+                    bipolar_markups_Grey_Matter.append(bi_tag)
+                    bipolar_RAS_Grey_Matter.append(middle_point)
+                    fidNode_Bipolar_Grey_Matter.AddControlPoint(middle_point, bi_tag)
+                
+    # Lock all markups
+    for markupN in range(fidNode_Bipolar.GetNumberOfControlPoints()):
+        fidNode_Bipolar.SetNthControlPointLocked(markupN,True)
+        fidNode_Bipolar.SetNthControlPointSelected(markupN,0)
+    for markupN in range(fidNode_Bipolar_White_Matter.GetNumberOfControlPoints()):
+        fidNode_Bipolar_White_Matter.SetNthControlPointLocked(markupN,True)
+        fidNode_Bipolar_White_Matter.SetNthControlPointSelected(markupN,0)
+    for markupN in range(fidNode_Bipolar_Grey_Matter.GetNumberOfControlPoints()):
+        fidNode_Bipolar_Grey_Matter.SetNthControlPointLocked(markupN,True)
+        fidNode_Bipolar_Grey_Matter.SetNthControlPointSelected(markupN,0)
+    
+    if P[0] > 0:
+        # SELECTED color for the right hemisphere
+        fidNode_Bipolar.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+        fidNode_Bipolar_White_Matter.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+        fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+        # UNselected
+        fidNode_Bipolar.GetDisplayNode().SetColor([0/255,0/255,0/255])
+        fidNode_Bipolar_White_Matter.GetDisplayNode().SetColor([0/255,0/255,0/255])
+        fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetColor([0/255,0/255,0/255])
         
-        # Gliph type
-        fidNode_Bipolar.GetDisplayNode().SetGlyphType(8)
-        fidNode_Bipolar.GetDisplayNode().SetGlyphScale(3)
-        fidNode_Bipolar.GetDisplayNode().SetTextScale(0)
-        
-        fidNode_Bipolar_White_Matter.GetDisplayNode().SetGlyphType(8)
-        fidNode_Bipolar_White_Matter.GetDisplayNode().SetGlyphScale(3)
-        fidNode_Bipolar_White_Matter.GetDisplayNode().SetTextScale(0)
-        
-        fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetGlyphType(8)
-        fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetGlyphScale(3)
-        fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetTextScale(0)
-        
-        # Count the number of contacts on White Matter
-        bipolar_number_nodes_White_Matter = len(bipolar_markups_White_Matter)
-        bipolar_number_nodes_White_Matter_Right = len([1 for RAScoord in bipolar_RAS_White_Matter if RAScoord[0] > 0])
-        bipolar_number_nodes_White_Matter_Left = bipolar_number_nodes_White_Matter - bipolar_number_nodes_White_Matter_Right
-        
-        # Count the number of contacts on Grey Matter
-        bipolar_number_nodes_Grey_Matter = len(bipolar_markups_Grey_Matter)
-        bipolar_number_nodes_Grey_Matter_Right = len([1 for RAScoord in bipolar_RAS_Grey_Matter if RAScoord[0] > 0])
-        bipolar_number_nodes_Grey_Matter_Left = bipolar_number_nodes_Grey_Matter - bipolar_number_nodes_Grey_Matter_Right
-        
-        # Count the number of contacts outside brain
-        bipolar_number_nodes_outside_brain = len(bipolar_markups_outside_brain)
-        bipolar_number_nodes_outside_brain_Right = len([1 for RAScoord in bipolar_RAS_outside_brain if RAScoord[0] > 0])
-        bipolar_number_nodes_outside_brain_Left = bipolar_number_nodes_outside_brain - bipolar_number_nodes_outside_brain_Right
-        
-        # Dictionary to store all the values
-        global bipolar_counted_nodes_Dict
-        bipolar_counted_nodes_Dict = {"WhiteMatter_Right": bipolar_number_nodes_White_Matter_Right,
-                                        "WhiteMatter_Left": bipolar_number_nodes_White_Matter_Left,
-                                        "WhiteMatter": bipolar_number_nodes_White_Matter,
-                                        "GreyMatter_Right": bipolar_number_nodes_Grey_Matter_Right,
-                                        "GreyMatter_Left": bipolar_number_nodes_Grey_Matter_Left,
-                                        "GreyMatter": bipolar_number_nodes_Grey_Matter,
-                                        "Outside_Right": bipolar_number_nodes_outside_brain_Right,
-                                        "Outside_Left": bipolar_number_nodes_outside_brain_Left,
-                                        "Outside": bipolar_number_nodes_outside_brain,
-                                        "BrainVolume_Right": right_hemisphere_Volume,
-                                        "BrainVolume_Left": left_hemisphere_Volume,
-                                        "BrainVolume": brain_Volume}
-        
-        logging.info("Bipolar contact placement complete.\n") 
+    else:
+        # Selected
+        fidNode_Bipolar.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+        fidNode_Bipolar_White_Matter.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+        fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetSelectedColor([255/255,255/255,225/255])
+        # Unselected
+        fidNode_Bipolar.GetDisplayNode().SetColor([0/255,0/255,0/255])
+        fidNode_Bipolar_White_Matter.GetDisplayNode().SetColor([0/255,0/255,0/255])
+        fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetColor([0/255,0/255,0/255])
+    
+    # Gliph type
+    fidNode_Bipolar.GetDisplayNode().SetGlyphType(8)
+    fidNode_Bipolar.GetDisplayNode().SetGlyphScale(3)
+    fidNode_Bipolar.GetDisplayNode().SetTextScale(0)
+    
+    fidNode_Bipolar_White_Matter.GetDisplayNode().SetGlyphType(8)
+    fidNode_Bipolar_White_Matter.GetDisplayNode().SetGlyphScale(3)
+    fidNode_Bipolar_White_Matter.GetDisplayNode().SetTextScale(0)
+    
+    fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetGlyphType(8)
+    fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetGlyphScale(3)
+    fidNode_Bipolar_Grey_Matter.GetDisplayNode().SetTextScale(0)
+    
+    # Count the number of contacts on White Matter
+    bipolar_number_nodes_White_Matter = len(bipolar_markups_White_Matter)
+    bipolar_number_nodes_White_Matter_Right = len([1 for RAScoord in bipolar_RAS_White_Matter if RAScoord[0] > 0])
+    bipolar_number_nodes_White_Matter_Left = bipolar_number_nodes_White_Matter - bipolar_number_nodes_White_Matter_Right
+    
+    # Count the number of contacts on Grey Matter
+    bipolar_number_nodes_Grey_Matter = len(bipolar_markups_Grey_Matter)
+    bipolar_number_nodes_Grey_Matter_Right = len([1 for RAScoord in bipolar_RAS_Grey_Matter if RAScoord[0] > 0])
+    bipolar_number_nodes_Grey_Matter_Left = bipolar_number_nodes_Grey_Matter - bipolar_number_nodes_Grey_Matter_Right
+    
+    # Count the number of contacts outside brain
+    bipolar_number_nodes_outside_brain = len(bipolar_markups_outside_brain)
+    bipolar_number_nodes_outside_brain_Right = len([1 for RAScoord in bipolar_RAS_outside_brain if RAScoord[0] > 0])
+    bipolar_number_nodes_outside_brain_Left = bipolar_number_nodes_outside_brain - bipolar_number_nodes_outside_brain_Right
+    
+    # Dictionary to store all the values
+    global bipolar_counted_nodes_Dict
+    bipolar_counted_nodes_Dict = {"WhiteMatter_Right": bipolar_number_nodes_White_Matter_Right,
+                                    "WhiteMatter_Left": bipolar_number_nodes_White_Matter_Left,
+                                    "WhiteMatter": bipolar_number_nodes_White_Matter,
+                                    "GreyMatter_Right": bipolar_number_nodes_Grey_Matter_Right,
+                                    "GreyMatter_Left": bipolar_number_nodes_Grey_Matter_Left,
+                                    "GreyMatter": bipolar_number_nodes_Grey_Matter,
+                                    "Outside_Right": bipolar_number_nodes_outside_brain_Right,
+                                    "Outside_Left": bipolar_number_nodes_outside_brain_Left,
+                                    "Outside": bipolar_number_nodes_outside_brain,
+                                    "BrainVolume_Right": right_hemisphere_Volume,
+                                    "BrainVolume_Left": left_hemisphere_Volume,
+                                    "BrainVolume": brain_Volume}
+    
+    logging.info("Bipolar contact placement complete.\n") 
 
 
         
@@ -1025,7 +1022,6 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         self.ui.electrodesSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         self.ui.fixedVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        self.ui.checkBox_bipolar.connect("toggled(bool)", self.updateParameterNodeFromGUI)
         self.ui.inputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         self.ui.outputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         self.ui.checkBox_transfer.connect("toggled(bool)", self.updateParameterNodeFromGUI)
@@ -1128,9 +1124,8 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         # Update node selectors and sliders
         self.ui.inputSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
-        self.ui.electrodesSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
+        self.ui.electrodesSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputElectrodes"))
         self.ui.fixedVolumeSelector.setCurrentNode(self._parameterNode.GetNodeReference("fixedVolume"))
-        self.ui.checkBox_bipolar.checked = (self._parameterNode.GetParameter("Bipolar") == "true")
         self.ui.checkBox_transfer.checked = (self._parameterNode.GetParameter("Transfer") == "false")
         self.ui.inputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputListVolume"))
         self.ui.outputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputListVolume"))
@@ -1146,7 +1141,7 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             self.ui.applyButton.enabled = False
             
         # Update buttons states and tooltips
-        if self._parameterNode.GetNodeReference("InputVolume"):
+        if self._parameterNode.GetNodeReference("InputElectrodes"):
             self.ui.saveButton.toolTip = "Generate table"
             self.ui.saveButton.enabled = True
         else:
@@ -1168,13 +1163,12 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         wasModified = self._parameterNode.StartModify()  # Modify all properties in a single batch
 
         self._parameterNode.SetNodeReferenceID("InputVolume", self.ui.inputSelector.currentNodeID)
-        self._parameterNode.SetNodeReferenceID("InputVolume", self.ui.electrodesSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("InputElectrodes", self.ui.electrodesSelector.currentNodeID)
         self._parameterNode.SetNodeReferenceID("fixedVolume", self.ui.fixedVolumeSelector.currentNodeID)
         self._parameterNode.SetNodeReferenceID("InputListVolume", self.ui.inputListSelector.currentNodeID)
         self._parameterNode.SetNodeReferenceID("OutputListVolume", self.ui.outputListSelector.currentNodeID)
         self._parameterNode.SetParameter("Directory", str(self.ui.DirectoryButton.directory))
         self._parameterNode.SetParameter("Directory_Subject", str(self.ui.DirectoryButton_subject.directory))
-        self._parameterNode.SetParameter("Bipolar", "true" if self.ui.checkBox_bipolar.checked else "false")
         self._parameterNode.SetParameter("Transfer", "true" if self.ui.checkBox_transfer.checked else "false")
 
         self._parameterNode.EndModify(wasModified)
@@ -1187,12 +1181,11 @@ class AutoelectrodesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
             # Compute output
             fidNode = self.ui.inputSelector.currentNode()
-            checked_bipolar = self.ui.checkBox_bipolar.checked
             
             # checked_mapping = self.ui.checkBox_mapping.checked
             fixedVolumeNode = self.ui.fixedVolumeSelector.currentNode()
             
-            self.logic.process(fidNode,checked_bipolar)
+            self.logic.process(fidNode)
     
     def onPushButton(self):
         with slicer.util.tryWithErrorDisplay("Failed to compute results.", waitCursor=True):
@@ -1256,13 +1249,13 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         if not parameterNode.GetParameter("Bipolar"):
             parameterNode.SetParameter("Bipolar", "false")
 
-    def process(self, fidNode,checked_bipolar):
+    def process(self, fidNode):
         """
         Run the processing algorithm.
         Can be used without GUI widget.
         :param fidNode: Markup node where the start and ending contacts of the electrodes to be processed are
         :param fixedVolumeNode: Volume node to be used as fixed volume for the MNI registration of the brain
-        :param checked_bipolar: boolean to compute the bipolar montage of the electrodes too
+        
         """
 
         if not fidNode:
@@ -1271,7 +1264,7 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         startTime = time.time()
         logging.info("Processing electrodes...")
         
-        findContacts(fidNode,checked_bipolar)
+        findContacts(fidNode)
         
         stopTime = time.time()
         logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
