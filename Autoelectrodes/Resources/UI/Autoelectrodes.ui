@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>474</width>
-    <height>675</height>
+    <width>350</width>
+    <height>847</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
@@ -16,11 +16,14 @@
      <property name="maximumSize">
       <size>
        <width>16777215</width>
-       <height>16777215</height>
+       <height>90</height>
       </size>
      </property>
      <property name="text">
       <string>Autoelectrodes</string>
+     </property>
+     <property name="collapsed">
+      <bool>false</bool>
      </property>
      <layout class="QFormLayout" name="formLayout_2">
       <item row="0" column="0">
@@ -45,6 +48,9 @@
          <stringlist>
           <string>vtkMRMLMarkupsFiducialNode</string>
          </stringlist>
+        </property>
+        <property name="showHidden">
+         <bool>false</bool>
         </property>
         <property name="showChildNodeTypes">
          <bool>false</bool>
@@ -74,9 +80,239 @@
     </widget>
    </item>
    <item>
+    <widget class="ctkCollapsibleButton" name="visualizationCollapsibleButton">
+     <property name="maximumSize">
+      <size>
+       <width>16777215</width>
+       <height>16777215</height>
+      </size>
+     </property>
+     <property name="text">
+      <string>Visualization</string>
+     </property>
+     <property name="collapsed">
+      <bool>true</bool>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <item>
+       <widget class="qSlicerSimpleMarkupsWidget" name="visulizeMarkupsWidget">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="mouseTracking">
+         <bool>false</bool>
+        </property>
+        <property name="tabletTracking">
+         <bool>false</bool>
+        </property>
+        <property name="acceptDrops">
+         <bool>false</bool>
+        </property>
+        <property name="inputMethodHints">
+         <set>Qt::ImhNone</set>
+        </property>
+        <property name="enterPlaceModeOnNodeChange">
+         <bool>false</bool>
+        </property>
+        <property name="jumpToSliceEnabled">
+         <bool>true</bool>
+        </property>
+        <property name="nodeSelectorVisible">
+         <bool>false</bool>
+        </property>
+        <property name="optionsVisible">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="ctkCollapsibleGroupBox" name="CollapsibleGroupBox">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="title">
+         <string>Advanced settings</string>
+        </property>
+        <property name="collapsed">
+         <bool>false</bool>
+        </property>
+        <layout class="QFormLayout" name="formLayout_3">
+         <item row="0" column="0">
+          <widget class="QLabel" name="label_3">
+           <property name="text">
+            <string>Template:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QComboBox" name="templateColor">
+           <property name="enabled">
+            <bool>true</bool>
+           </property>
+           <property name="editable">
+            <bool>false</bool>
+           </property>
+           <property name="currentText">
+            <string>None</string>
+           </property>
+           <item>
+            <property name="text">
+             <string>None</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Left  hemisphere (Red)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Right hemisphere (Blue)</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Selected/Unselected (White/Black)</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="label_9">
+           <property name="text">
+            <string>Opacity:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QComboBox" name="templateOpacity">
+           <item>
+            <property name="text">
+             <string>100%</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>50%</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>20%</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="label_10">
+           <property name="text">
+            <string>Text:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QComboBox" name="templateText">
+           <item>
+            <property name="text">
+             <string>Yes</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>No</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item row="3" column="0">
+          <widget class="QLabel" name="label_11">
+           <property name="text">
+            <string>Order:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="1">
+          <widget class="QComboBox" name="templateOrder">
+           <item>
+            <property name="text">
+             <string>Alphanumerical</string>
+            </property>
+           </item>
+          </widget>
+         </item>
+         <item row="4" column="1">
+          <widget class="QCheckBox" name="checkBox_RemoveDuplicates">
+           <property name="text">
+            <string>Remove duplicates</string>
+           </property>
+           <property name="autoExclusive">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="5" column="1">
+          <widget class="QPushButton" name="applySettingsButton">
+           <property name="text">
+            <string>Apply settings</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="ctkCollapsibleButton" name="CollapsibleButton">
+        <property name="text">
+         <string>CollapsibleButton</string>
+        </property>
+        <widget class="QWidget" name="verticalLayoutWidget">
+         <property name="geometry">
+          <rect>
+           <x>90</x>
+           <y>100</y>
+           <width>2</width>
+           <height>2</height>
+          </rect>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_4"/>
+        </widget>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="ctkCollapsibleButton" name="recordingsCollapsibleButton">
+     <property name="text">
+      <string>EDF Viewer</string>
+     </property>
+     <property name="collapsed">
+      <bool>false</bool>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_3">
+      <item>
+       <widget class="ctkDirectoryButton" name="DirectoryButton_openEDF"/>
+      </item>
+      <item>
+       <widget class="ctkPushButton" name="openEDFButton">
+        <property name="text">
+         <string>Open EDF</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
     <widget class="ctkCollapsibleButton" name="outputsCollapsibleButton">
      <property name="text">
       <string>Mapping</string>
+     </property>
+     <property name="checked">
+      <bool>false</bool>
      </property>
      <property name="collapsed">
       <bool>true</bool>
@@ -113,20 +349,20 @@
         </property>
        </widget>
       </item>
-      <item row="2" column="1">
-       <widget class="QPushButton" name="pushButton">
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_4">
         <property name="text">
-         <string>Register</string>
+         <string>Destination folder:</string>
         </property>
        </widget>
       </item>
       <item row="1" column="1">
        <widget class="ctkDirectoryButton" name="DirectoryButton"/>
       </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_4">
+      <item row="2" column="1">
+       <widget class="QPushButton" name="pushButton">
         <property name="text">
-         <string>Destination folder:</string>
+         <string>Register</string>
         </property>
        </widget>
       </item>
@@ -243,27 +479,13 @@
         </property>
        </widget>
       </item>
-      <item row="9" column="0">
-       <widget class="QLabel" name="label_7">
-        <property name="text">
-         <string/>
-        </property>
-       </widget>
-      </item>
-      <item row="9" column="1">
-       <widget class="QPushButton" name="copyButton">
-        <property name="text">
-         <string>Copy / Tranfer</string>
-        </property>
-       </widget>
-      </item>
       <item row="5" column="1">
        <widget class="ctkCollapsibleButton" name="transferCollapsibleButton">
         <property name="text">
          <string>Enable transfer</string>
         </property>
         <property name="collapsed">
-         <bool>true</bool>
+         <bool>false</bool>
         </property>
         <property name="collapsedHeight">
          <number>0</number>
@@ -279,6 +501,20 @@
         </layout>
        </widget>
       </item>
+      <item row="9" column="0">
+       <widget class="QLabel" name="label_7">
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+      <item row="9" column="1">
+       <widget class="QPushButton" name="copyButton">
+        <property name="text">
+         <string>Copy / Tranfer</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>
@@ -286,6 +522,12 @@
     <widget class="ctkCollapsibleButton" name="outputsCollapsibleButton_2">
      <property name="text">
       <string>Generate electrodes table</string>
+     </property>
+     <property name="checked">
+      <bool>false</bool>
+     </property>
+     <property name="collapsed">
+      <bool>true</bool>
      </property>
      <layout class="QFormLayout" name="formLayout_4">
       <item row="0" column="0">
@@ -337,7 +579,7 @@
        </widget>
       </item>
       <item row="2" column="1">
-       <widget class="QPushButton" name="saveButton">
+       <widget class="QPushButton" name="saveTableButton">
         <property name="toolTip">
          <string>Save all files of the subject</string>
         </property>
@@ -350,30 +592,53 @@
     </widget>
    </item>
    <item>
-    <spacer name="verticalSpacer">
-     <property name="orientation">
-      <enum>Qt::Vertical</enum>
+    <widget class="ctkCollapsibleButton" name="saveBundleCollapsibleButton">
+     <property name="text">
+      <string>Save Medical Bundle</string>
      </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>20</width>
-       <height>40</height>
-      </size>
+     <property name="collapsed">
+      <bool>true</bool>
      </property>
-    </spacer>
-   </item>
-   <item>
-    <spacer name="verticalSpacer">
-     <property name="orientation">
-      <enum>Qt::Vertical</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>20</width>
-       <height>40</height>
-      </size>
-     </property>
-    </spacer>
+     <layout class="QFormLayout" name="formLayout_4">
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_5">
+        <property name="text">
+         <string>Name:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLineEdit" name="saveFileName"/>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_8">
+        <property name="text">
+         <string>Destination folder:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="ctkDirectoryButton" name="DirectoryButton_saveBundle">
+        <property name="toolTip">
+         <string>Directory where all the information of the subject will be stored</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QPushButton" name="saveBundleButton">
+        <property name="toolTip">
+         <string>Save all files of the subject</string>
+        </property>
+        <property name="text">
+         <string>Save</string>
+        </property>
+        <property name="checkable">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
    </item>
   </layout>
  </widget>
@@ -385,9 +650,20 @@
    <container>1</container>
   </customwidget>
   <customwidget>
+   <class>ctkCollapsibleGroupBox</class>
+   <extends>QGroupBox</extends>
+   <header>ctkCollapsibleGroupBox.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
    <class>ctkDirectoryButton</class>
    <extends>QWidget</extends>
    <header>ctkDirectoryButton.h</header>
+  </customwidget>
+  <customwidget>
+   <class>ctkPushButton</class>
+   <extends>QPushButton</extends>
+   <header>ctkPushButton.h</header>
   </customwidget>
   <customwidget>
    <class>qMRMLNodeComboBox</class>
@@ -399,6 +675,17 @@
    <extends>QWidget</extends>
    <header>qMRMLWidget.h</header>
    <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>qSlicerWidget</class>
+   <extends>QWidget</extends>
+   <header>qSlicerWidget.h</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>qSlicerSimpleMarkupsWidget</class>
+   <extends>qSlicerWidget</extends>
+   <header>qSlicerSimpleMarkupsWidget.h</header>
   </customwidget>
  </customwidgets>
  <resources/>
@@ -414,8 +701,8 @@
      <y>135</y>
     </hint>
     <hint type="destinationlabel">
-     <x>366</x>
-     <y>171</y>
+     <x>473</x>
+     <y>706</y>
     </hint>
    </hints>
   </connection>
@@ -430,8 +717,8 @@
      <y>285</y>
     </hint>
     <hint type="destinationlabel">
-     <x>371</x>
-     <y>355</y>
+     <x>455</x>
+     <y>752</y>
     </hint>
    </hints>
   </connection>
@@ -446,8 +733,8 @@
      <y>285</y>
     </hint>
     <hint type="destinationlabel">
-     <x>371</x>
-     <y>319</y>
+     <x>455</x>
+     <y>747</y>
     </hint>
    </hints>
   </connection>
@@ -462,8 +749,8 @@
      <y>337</y>
     </hint>
     <hint type="destinationlabel">
-     <x>334</x>
-     <y>279</y>
+     <x>459</x>
+     <y>789</y>
     </hint>
    </hints>
   </connection>
@@ -478,8 +765,24 @@
      <y>132</y>
     </hint>
     <hint type="destinationlabel">
-     <x>364</x>
-     <y>57</y>
+     <x>473</x>
+     <y>33</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>extension_test</sender>
+   <signal>mrmlSceneChanged(vtkMRMLScene*)</signal>
+   <receiver>visulizeMarkupsWidget</receiver>
+   <slot>setMRMLScene(vtkMRMLScene*)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>236</x>
+     <y>423</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>147</x>
+     <y>76</y>
     </hint>
    </hints>
   </connection>
