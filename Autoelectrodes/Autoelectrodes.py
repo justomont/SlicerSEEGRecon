@@ -1,42 +1,20 @@
-# Plotly imports
-from plotly import graph_objects as go
-from plotly.subplots import make_subplots
 
-try:
-    import PyQt5
-except: 
-    import pip
-    pip.main(["install","PyQt5"])
-    import PyQt5
 
-# Qt imports for GUI
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QComboBox, QSlider
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QSlider, QFileDialog
+from scipy import signal
 
-import pyqtgraph as pg
-import slicer
-
-# Additional numpy imports
-from numpy import linspace, min, max
-
-import ctk
 import json
-
-import sys
-from PyQt5 import QtWidgets, QtCore, QtGui
-from pyedflib import EdfReader
-from pyedflib import EdfWriter
-
 
 import logging
 import os
 
 import vtk
+import ctk, DICOMLib
 
 import slicer
 from slicer.ScriptedLoadableModule import *
-from slicer.util import VTKObservationMixin
+from slicer.util import VTKObservationMixin, pip_install
+
+from NiBabelModelIO import NiBabelModelIOLogic
 
 import re
 import numpy as np
@@ -57,31 +35,23 @@ try:
     import pandas as pd
 except: 
     import pip
-    pip.main(["install","pandas"])
+    pip_install("pandas")
     import pandas as pd
     
-try:
-    import pyedflib
-except: 
-    import pip
-    pip.main(["install","pyEDFlib"])
-    import pyedflib
-    
     
 try:
     import plotly
 except: 
     import pip
-    pip.main(["install","plotly"])
+    pip_install("plotly")
     import plotly
 
-try:
-    import PyQt6
-except: 
+try: 
+    from PySide2 import QtWidgets
+except:
     import pip
-    pip.main(["install","PyQt6"])
-    import PyQt6
-
+    pip_install("PySide2")
+    from PySide2 import QtWidgets
 
 
 def has_numbers(inputString):
@@ -213,11 +183,21 @@ def computeBrainVolume(brainModelNode):
     
     return brain_volume
 
+def natural_keys(text):
+    """
+    Sort helper: splits strings into list of ints and strings for natural sort.
+    E.g., "B10" -> ["B", 10]
+    """
+    return [int(s) if s.isdigit() else s.lower() for s in re.split(r'(\d+)', text)]
+
 def findContacts(fidNode):
     
     # Get the aseg map
     global asegVolumeNode, asegVoxelArray
-    asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
+    # In the new versions of the module the aseg volume is called brain_segmentation but aseg in the old ones
+    asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('brain_segmentation')
+    if not asegVolumeNode: 
+        asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
     asegVoxelArray = slicer.util.arrayFromVolume(asegVolumeNode)
     
     # All markup's names and positions in RAS coordinates
@@ -582,9 +562,13 @@ def findContacts(fidNode):
     monopolar_number_nodes_outside_brain_Left = monopolar_number_nodes_outside_brain - monopolar_number_nodes_outside_brain_Right
 
     # Obtain volume of the hemispheres 
-    right_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('rhp')
+    right_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('rh_grey')
+    if not right_hemisphere_VolumeNode: 
+        right_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('rhp')
     right_hemisphere_Volume = computeBrainVolume(right_hemisphere_VolumeNode)
-    left_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('lhp')
+    left_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('lh_grey')
+    if not left_hemisphere_VolumeNode: 
+        left_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('lhp')
     left_hemisphere_Volume = computeBrainVolume(left_hemisphere_VolumeNode)
     brain_Volume = right_hemisphere_Volume + left_hemisphere_Volume
     
@@ -958,622 +942,30 @@ def regionsMNInibabel(fixedVolumeNode):
     
     brain_img_data = arrayFromVolume(fixedVolumeNode)
 
-#
-# EDF Viewer
-#
+def importAndLoadDICOMFolder(dicom_folder):
+    # Step 1: Create and initialize DICOM database
+    dbDir = os.path.join(slicer.app.temporaryPath, "MyDICOMDb")
+    os.makedirs(dbDir, exist_ok=True)
+    dbPath = os.path.join(dbDir, "ctkDICOM.sql")
 
-# Fourth-version
-class ClickableGraphicsView(qt.QGraphicsView):
-    def __init__(self, parent=None):
-        qt.QGraphicsView.__init__(self, parent)
-        self._window = parent
-        self.setMouseTracking(True)  
-        
-    def mousePressEvent(self, event):
-        if event.button() == qt.Qt.LeftButton and hasattr(self._window, 'waitingForClick') and self._window.waitingForClick:
-            if self._window:
-                self._window.handleSignalClick(event)
-        qt.QGraphicsView.mousePressEvent(self, event)
+    db = ctk.ctkDICOMDatabase()
+    db.openDatabase(dbPath, "SLICER")
+    slicer.dicomDatabase = db  # attach to Slicer
 
-class EDFPopupWindow(qt.QDialog):
-    def __init__(self, parent=None):
-        super().__init__(parent)
+    # Step 2: Import DICOM folder
+    indexer = ctk.ctkDICOMIndexer()
+    indexer.addDirectory(db, dicom_folder)
+    indexer.waitForImportFinished()
 
-        self.setWindowTitle("Advanced EDF File Viewer")
-        self.setMinimumSize(800, 600)
-        
-        # Initialize properties
-        self.edfFile = None
-        self.channelNames = []
-        self.selectedChannels = []
-        self.currentPosition = 0
-        self.windowSize = 3
-        self.sampleRate = None
-        self.annotations = ([], [], [])
-        self.selectedAnnotation = None
-        
-        # Create graphics scene and view
-        self.scene = qt.QGraphicsScene()
-        self.view = qt.QGraphicsView(self.scene)
-        self.view.setHorizontalScrollBarPolicy(qt.Qt.ScrollBarAlwaysOn)
-        self.view.setVerticalScrollBarPolicy(qt.Qt.ScrollBarAlwaysOn)
-        self.view = ClickableGraphicsView(self)  # Use the custom view class
-        self.view.setScene(self.scene)
-
-        # Create annotation list before setupUI
-        self.annotationList = qt.QListWidget()
-
-        self.setupUI()
-        
-    def setupUI(self):
-        mainLayout = qt.QVBoxLayout(self)
-        
-        # Top controls
-        controlsLayout = qt.QHBoxLayout()
-        
-        # File controls
-        fileGroup = qt.QGroupBox("File Controls")
-        fileLayout = qt.QVBoxLayout()
-
-        # File operation buttons
-        self.openEDFButton = qt.QPushButton("Open EDF File")
-        self.saveButton = qt.QPushButton("Save Annotations")
-        
-        # Add save options
-        saveOptionsGroup = qt.QGroupBox("Save Options")
-        saveOptionsLayout = qt.QVBoxLayout()
-        self.newEDFRadio = qt.QRadioButton("Save as new EDF+")
-        self.updateEDFRadio = qt.QRadioButton("Update existing EDF+")
-        self.newEDFRadio.setChecked(True)
-        
-        saveOptionsLayout.addWidget(self.newEDFRadio)
-        saveOptionsLayout.addWidget(self.updateEDFRadio)
-        saveOptionsGroup.setLayout(saveOptionsLayout)
-        
-        # Connect signals
-        self.openEDFButton.clicked.connect(self.openEDFFile)
-        self.saveButton.clicked.connect(self.saveAllAnnotations)
-        
-        # Add widgets to layout
-        fileLayout.addWidget(self.openEDFButton)
-        fileLayout.addWidget(self.saveButton)
-        fileLayout.addWidget(saveOptionsGroup)
-        fileGroup.setLayout(fileLayout)
-        controlsLayout.addWidget(fileGroup)
-        
-        # Channel controls
-        channelGroup = qt.QGroupBox("Channels")
-        channelLayout = qt.QVBoxLayout()
-        self.channelList = qt.QListWidget()
-        self.channelList.setSelectionMode(qt.QAbstractItemView.MultiSelection)
-        print('debug setup UI')
-        self.channelList.itemSelectionChanged.connect(self.updatePlot)
-        channelLayout.addWidget(self.channelList)
-        channelGroup.setLayout(channelLayout)
-        controlsLayout.addWidget(channelGroup)
-        
-        # Annotation controls
-        annotationGroup = qt.QGroupBox("Annotations")
-        annotationLayout = qt.QVBoxLayout()
-        
-        self.annotationList.itemClicked.connect(self.selectAnnotation)
-        
-        annotationButtonLayout = qt.QHBoxLayout()
-        self.addAnnotationButton = qt.QPushButton("Add")
-        self.editAnnotationButton = qt.QPushButton("Edit")
-        self.deleteAnnotationButton = qt.QPushButton("Delete")
-        
-        self.addAnnotationButton.clicked.connect(self.addAnnotation)
-        self.editAnnotationButton.clicked.connect(self.editAnnotation)
-        self.deleteAnnotationButton.clicked.connect(self.deleteAnnotation)
-        
-        annotationButtonLayout.addWidget(self.addAnnotationButton)
-        annotationButtonLayout.addWidget(self.editAnnotationButton)
-        annotationButtonLayout.addWidget(self.deleteAnnotationButton)
-        
-        annotationLayout.addWidget(self.annotationList)
-        annotationLayout.addLayout(annotationButtonLayout)
-        annotationGroup.setLayout(annotationLayout)
-        controlsLayout.addWidget(annotationGroup)
-        
-        mainLayout.addLayout(controlsLayout)
-        
-        # Navigation controls
-        navigationLayout = qt.QHBoxLayout()
-        self.timeSlider = qt.QSlider(qt.Qt.Horizontal)
-        self.timeSlider.setMinimum(0)
-        self.timeSlider.setMaximum(int(self.duration) if hasattr(self, 'duration') else 100)
-        self.timeSlider.setSingleStep(1)
-        print('debug setupui 2')
-        self.timeSlider.valueChanged.connect(self.updatePlot)
-        self.timeLabel = qt.QLabel("Time: 0.0s")
-        navigationLayout.addWidget(self.timeLabel)
-        navigationLayout.addWidget(self.timeSlider)
-        mainLayout.addLayout(navigationLayout)
-            
-
-        # Add graphics view
-        mainLayout.addWidget(self.view)
-
-    def saveAllAnnotations(self):
-        """Save both channel-specific and global annotations"""
-        if not hasattr(self, 'edfFilePath') or not self.annotations:
-            return
-            
-        try:
-            # Separate channel-specific and global annotations
-            channel_specific = [a for a in self.annotations if a.get('channels') and len(a['channels']) > 0]
-            global_annots = [a for a in self.annotations if not a.get('channels') or not a['channels']]
-            
-            # Save channel-specific annotations to JSON if they exist
-            if channel_specific:
-                json_filename = self.edfFilePath.lower().replace(".edf", "_annotations.json")
-                with open(json_filename, 'w', encoding='utf-8') as f:
-                    json.dump(channel_specific, f, indent=4)
-            
-            # Save global annotations to EDF based on selected option
-            if global_annots:
-                save_option = 'new_edf' if self.newEDFRadio.isChecked() else 'update_edf'
-                target_file = self.edfFilePath
-                
-                if save_option == 'new_edf':
-                    base, ext = os.path.splitext(self.edfFilePath)
-                    target_file = f"{base}_with_annotations{ext}"
-                    counter = 1
-                    while os.path.exists(target_file):
-                        target_file = f"{base}_with_annotations_{counter}{ext}"
-                        counter += 1
-                
-                # Create new EDF writer
-                writer = pyedflib.EdfWriter(
-                    target_file,
-                    self.channelCount,
-                    file_type=pyedflib.FILETYPE_EDFPLUS
-                )
-                
-                # Copy signals and headers
-                for i in range(self.channelCount):
-                    writer.setLabel(i, self.channelNames[i])
-                    writer.setSamplefrequency(i, self.sampleRate)
-                    writer.writePhysicalSamples(self.edfFile.readSignal(i))
-                
-                # Write global annotations
-                for annot in global_annots:
-                    writer.writeAnnotation(
-                        float(annot['onset']),
-                        float(annot.get('duration', 0)),
-                        str(annot['description'])
-                    )
-                
-                writer.close()
-                
-            slicer.util.showStatusMessage(
-                f"Annotations saved successfully" + 
-                (f"\nChannel annotations: {json_filename}" if channel_specific else "") +
-                (f"\nGlobal annotations: {target_file}" if global_annots else "")
-            )
-                
-        except Exception as e:
-            slicer.util.errorDisplay(f"Error saving annotations: {str(e)}")
-        
-
-    def openEDFFile(self):
-        fileDialog = qt.QFileDialog()
-        fileDialog.setFileMode(qt.QFileDialog.ExistingFile)
-        fileDialog.setNameFilter("EDF Files (*.edf *.EDF *.edf+ *.EDF+)")
-        fileDialog.setDirectory(os.path.expanduser("~"))
-        
-        if not fileDialog.exec_():
-            return
-            
-        try:
-            self.edfFilePath = fileDialog.selectedFiles()[0]
-            
-            # Load EDF file
-            if hasattr(self, 'edfFile') and self.edfFile:
-                self.edfFile.close()
-                
-            self.edfFile = pyedflib.EdfReader(str(self.edfFilePath))
-            
-            # Get basic file information with proper type conversion
-            self.channelNames = self.edfFile.getSignalLabels()
-            self.channelCount = int(self.edfFile.signals_in_file)
-            self.duration = float(self.edfFile.getFileDuration())
-            self.sampleRate = int(self.edfFile.getSampleFrequency(0))
-            
-            # Load annotations with proper type handling
-            try:
-                raw_annotations = self.edfFile.readAnnotations()
-                if raw_annotations:
-                    onset, duration, description = raw_annotations
-                    global_annotations = []
-                    for i in range(len(onset)):
-                        desc = description[i].decode('utf-8') if isinstance(description[i], bytes) else description[i]
-                        global_annotations.append({
-                            'onset': float(onset[i]),  # Ensure float
-                            'duration': float(duration[i]),  # Ensure float
-                            'description': str(desc),
-                            'global': True
-                        })
-                    self.annotations = global_annotations
-                else:
-                    self.annotations = []
-            except Exception as e:
-                print(f"Error loading annotations: {e}")
-                self.annotations = []
-            
-            # Update UI elements
-            self.updateChannelList()
-            self.setupTimeSlider()
-            self.updateAnnotationList()
-            print('debug open EDF file')
-            self.updatePlot()
-            
-            # Display file information
-            fileInfo = f"File: {os.path.basename(self.edfFilePath)}\n"
-            fileInfo += f"Number of Channels: {self.channelCount}\n"
-            fileInfo += f"Sample Rate: {self.sampleRate} Hz\n"
-            fileInfo += f"Duration: {self.duration} s\n"
-                
-        except Exception as e:
-            if hasattr(self, 'edfFile') and self.edfFile:
-                self.edfFile.close()
-                self.edfFile = None
-            slicer.util.errorDisplay(f"Error opening EDF file: {str(e)}")
-
-    def saveEDFFile(self):
-        if not self.edfFile:
-            return
-            
-        try:
-            # Save annotations to JSON
-            annotationFile = self.edfFilePath + "_annotations.json"
-            with open(annotationFile, 'w') as f:
-                json.dump(self.annotations, f)
-                
-            # Save modified EDF file
-            newFile = pyedflib.EdfWriter(
-                self.edfFilePath + "_modified.edf",
-                len(self.channelNames),
-                file_type=pyedflib.FILETYPE_EDFPLUS
-            )
-            
-            # Copy signals and headers
-            for i in range(self.channelCount):
-                newFile.setLabel(i, self.channelNames[i])
-                newFile.setSamplefrequency(i, self.sampleRate)
-                newFile.writePhysicalSamples(self.edfFile.readSignal(i))
-                
-            # Write annotations
-            for onset, duration, description in zip(*self.annotations):
-                newFile.writeAnnotation(onset, duration, description)
-                
-            newFile.close()
-            
-        except Exception as e:
-            slicer.util.errorDisplay(f"Error saving EDF file: {str(e)}")
-    
-    def updateChannelList(self):
-        """Update the channel list widget with available channels"""
-        if not hasattr(self, 'channelList'):
-            print("Error: channelList widget not initialized")
-            return
-            
-        try:
-            self.channelList.clear()
-            if hasattr(self, 'channelNames') and self.channelNames:
-                for channel in self.channelNames:
-                    item = qt.QListWidgetItem(channel)
-                    self.channelList.addItem(item)
-        except Exception as e:
-            print(f"Error updating channel list: {e}")
-
-    def selectAnnotation(self, item):
-        """Handle annotation selection"""
-        self.selectedAnnotation = self.annotationList.row(item)
-
-    def addAnnotation(self):
-        """Enable click mode for adding annotation"""
-        self.waitingForClick = True
-        self.isEditing = False
-        self.view.setCursor(qt.Qt.CrossCursor)
-
-    def handleSignalClick(self, event):
-        if not self.waitingForClick:
-            return
-            
-        dialog = qt.QDialog(self)
-        dialog.setWindowTitle("Add Annotation")
-        layout = qt.QVBoxLayout(dialog)
-        
-        # Description input
-        descLabel = qt.QLabel("Description:")
-        descInput = qt.QLineEdit()
-        layout.addWidget(descLabel)
-        layout.addWidget(descInput)
-        
-        # Channel selection
-        channelLabel = qt.QLabel("Select channels (optional):")
-        channelList = qt.QListWidget()
-        channelList.setSelectionMode(qt.QAbstractItemView.MultiSelection)
-        for channel in self.channelNames:
-            channelList.addItem(channel)
-        layout.addWidget(channelLabel)
-        layout.addWidget(channelList)
-        
-        # Create button box with standard buttons
-        buttonBox = qt.QDialogButtonBox(
-            qt.QDialogButtonBox.Ok | qt.QDialogButtonBox.Cancel,
-            qt.Qt.Horizontal,
-            dialog
-        )
-        
-        # Connect the button signals
-        buttonBox.accepted.connect(dialog.accept)
-        buttonBox.rejected.connect(dialog.reject)
-        layout.addWidget(buttonBox)
-        
-        dialog.setLayout(layout)
-        
-        # Execute dialog and handle result
-        if dialog.exec():  # Use exec() instead of exec_()
-            scene_pos = self.view.mapToScene(event.pos())
-            click_time = self.timeSlider.property('value') + (scene_pos.x() * (self.windowSize / self.view.viewport().width))
-            
-            # Create annotation
-            annotation = {
-                'onset': click_time,
-                'description': descInput.text,
-                'channels': [item.text() for item in channelList.selectedItems()],
-                'label': f"{descInput.text} @ {click_time:.1f}s"
-            }
-            
-            if annotation['channels']:
-                annotation['label'] += f" (Channels: {', '.join(annotation['channels'])})"
-                
-            # Add and update
-            self.annotations.append(annotation)
-            self.annotations.sort(key=lambda x: float(x['onset']))
-            self.updateAnnotationList()
-            print('debug handle signal click')
-            self.updatePlot()
-        
-        # Reset state
-        self.waitingForClick = False
-        self.view.setCursor(qt.Qt.ArrowCursor)
-
-    def editAnnotation(self):
-        if not hasattr(self, 'selectedAnnotation') or self.selectedAnnotation is None:
-            return
-        
-        annot = self.annotations[self.selectedAnnotation]
-        
-        # Create a dialog for editing
-        dialog = qt.QDialog(self)
-        dialog.setWindowTitle("Edit Annotation")
-        layout = qt.QVBoxLayout(dialog)
-        
-        # Description input
-        descLabel = qt.QLabel("Description:")
-        descInput = qt.QLineEdit(annot['description'])
-        
-        # Channel selection
-        channelLabel = qt.QLabel("Select channels:")
-        channelList = qt.QListWidget()
-        channelList.setSelectionMode(qt.QAbstractItemView.MultiSelection)
-        
-        for channel in self.channelNames:
-            item = qt.QListWidgetItem(channel)
-            if channel in annot.get('channels', []):
-                item.setSelected(True)
-            channelList.addItem(item)
-        
-        # Add widgets to layout
-        layout.addWidget(descLabel)
-        layout.addWidget(descInput)
-        layout.addWidget(channelLabel)
-        layout.addWidget(channelList)
-        
-        # Button box
-        buttonBox = qt.QDialogButtonBox(
-            qt.QDialogButtonBox.Ok | qt.QDialogButtonBox.Cancel
-        )
-        buttonBox.accepted.connect(dialog.accept)
-        buttonBox.rejected.connect(dialog.reject)
-        layout.addWidget(buttonBox)
-        
-        if dialog.exec():
-            annot['description'] = descInput.text
-            annot['channels'] = [item.text() for item in channelList.selectedItems()]
-            annot['label'] = f"{descInput.text} @ {annot['onset']:.1f}s"
-            if annot['channels']:
-                annot['label'] += f" (Channels: {', '.join(annot['channels'])})"
-            self.updateAnnotationList()
-            print('debug edit annotation')
-            self.updatePlot()
-
-
-    def deleteAnnotation(self):
-        if not hasattr(self, 'selectedAnnotation') or self.selectedAnnotation is None:
-            return
-            
-        try:
-            # Remove the selected annotation from the list
-            del self.annotations[self.selectedAnnotation]
-            self.selectedAnnotation = None
-            
-            # Update UI
-            self.updateAnnotationList()
-            print('debug delete')
-            self.updatePlot()
-        except Exception as e:
-            print(f"Error deleting annotation: {e}")
-
-
-    def updateAnnotationList(self):
-        """Update the annotation list widget"""
-        if hasattr(self, 'annotationList'):
-            self.annotationList.clear()
-            
-            # Check if annotations exist and are properly formatted
-            if not hasattr(self, 'annotations') or not self.annotations:
-                self.annotations = ([], [], [])  # Initialize empty annotations tuple
-                return
-                
-            try:
-                if isinstance(self.annotations, (list, tuple)):
-                    if len(self.annotations) == 3:
-                        onsets, durations, descriptions = self.annotations
-                    else:
-                        # Handle case where annotations is a list of dictionaries
-                        onsets = [a.get('onset', 0) for a in self.annotations]
-                        durations = [a.get('duration', 0) for a in self.annotations]
-                        descriptions = [a.get('description', '') for a in self.annotations]
-                        
-                    for i in range(len(onsets)):
-                        item = qt.QListWidgetItem(f"{onsets[i]}s: {descriptions[i]}")
-                        self.annotationList.addItem(item)
-            except Exception as e:
-                print(f"Error updating annotation list: {e}")
-                self.annotations = ([], [], [])  # Reset to empty annotations
-
-    def setupTimeSlider(self):
-        """Initialize the time slider based on EDF file duration"""
-        if hasattr(self, 'timeSlider') and hasattr(self, 'duration'):
-            self.timeSlider.setMinimum(0)
-            self.timeSlider.setMaximum(int(self.duration - self.windowSize))
-            self.timeSlider.setValue(0)
-            self.timeSlider.setSingleStep(1)
-            self.timeSlider.setPageStep(5)
-
-    def updatePlot(self):
-        
-        print('debug enter in the function')
-        
-        self.selectedChannels = [item.text() for item in self.channelList.selectedItems()]
-        
-        print('debug', self.selectedChannels)
-        
-        if not self.edfFile or not self.selectedChannels:
-            print('debug enter the conditional')
-            return
-                
-        self.scene.clear()
-        
-        # Get time window using the correct Qt method
-        start_time = float(self.timeSlider.property('value'))  # Use property() instead of getValue()
-        end_time = start_time + self.windowSize
-            
-        # Calculate samples
-        start_sample = int(start_time * self.sampleRate)
-        end_sample = int(end_time * self.sampleRate)
-        
-        # Get view width as property, not method
-        scene_width = self.view.width
-        time_to_pixel = scene_width / self.windowSize
-        
-        # Setup scaling and spacing
-        y_spacing = 80
-        
-        # Plot each channel
-        for idx, channel in enumerate(self.selectedChannels):
-            try:
-                channel_idx = self.channelNames.index(channel)
-                data = self.edfFile.readSignal(channel_idx)[start_sample:end_sample]
-                
-                # Normalize signal
-                data = (data - np.mean(data)) / (np.std(data) + 1e-6)
-                y_offset = idx * y_spacing
-                
-                # Create signal path
-                path = qt.QPainterPath()
-                path.moveTo(0, data[0] * y_spacing/4 + y_offset)
-                
-                for i in range(1, len(data)):
-                    x = i * (scene_width / len(data))
-                    y = data[i] * y_spacing/4 + y_offset
-                    path.lineTo(x, y)
-                
-                # Add signal trace
-                self.scene.addPath(path, qt.QPen(qt.QColor("black")))
-                
-                # Add channel label
-                text = self.scene.addText(channel)
-                text.setPos(-50, y_offset - 10)
-                
-            except Exception as e:
-                print(f"Error plotting channel {channel}: {e}")
-        
-        self.view.fitInView(self.scene.sceneRect)
-
-
-        
-        # Plot annotations
-        if hasattr(self, 'annotations'):
-            for annotation in self.annotations:
-                onset = annotation.get('onset', 0)
-                if start_time <= onset <= end_time:
-                    x_pos = (onset - start_time) * time_to_pixel
-                    
-                    # Draw annotation line
-                    if annotation.get('channels'):
-                        # Channel-specific annotation
-                        for ch in annotation['channels']:
-                            if ch in self.selectedChannels:
-                                ch_idx = self.selectedChannels.index(ch)
-                                y_pos = ch_idx * y_spacing
-                                line = self.scene.addLine(
-                                    x_pos, y_pos - y_spacing/2,
-                                    x_pos, y_pos + y_spacing/2,
-                                    qt.QPen(qt.QColor("red"))
-                                )
-                    else:
-                        # Global annotation
-                        line = self.scene.addLine(
-                            x_pos, 0,
-                            x_pos, len(self.selectedChannels) * y_spacing,
-                            qt.QPen(qt.QColor("lightgreen"))
-                        )
-                    
-                    # Add annotation text
-                    text = self.scene.addText(annotation['description'])
-                    text.setPos(x_pos + 5, 10)
-                    
-                
-        
-        # Update view - fix sceneRect access
-        rect = self.scene.sceneRect  # Get the rect first
-        self.view.fitInView(rect, qt.Qt.KeepAspectRatio)
-        
-        # Update time label
-        self.timeLabel.setText(f"Time: {start_time:.1f}s")
-
-
-    def resizeEvent(self, event):
-        qt.QDialog.resizeEvent(self, event)
-        if self.scene and self.scene.items():
-            rect = self.scene.sceneRect  # Get the rect first
-            self.view.fitInView(rect, qt.Qt.KeepAspectRatio)
-
-    def closeEvent(self, event):
-        # Clean up resources
-        if self.edfFile:
-            self.edfFile.close()
-            self.edfFile = None
-        
-        # Clear the scene
-        self.scene.clear()
-        
-        # Accept the close event
-        event.accept()
-
-# Ignore this function, I will add it to the main logic later
-#def showEDFPopup():
-    """
-    Function to be called from your existing module to show the EDF popup
-    """
-#    popup = EDFPopupWindow(slicer.util.mainWindow())
-#    popup.show()
+    # Step 3: Load all series
+    patients = db.patients()
+    for patientUID in patients:
+        studies = db.studiesForPatient(patientUID)
+        for studyUID in studies:
+            series = db.seriesForStudy(studyUID)
+            for seriesUID in series:
+                print(f"Loading Series UID: {seriesUID}")
+                DICOMLib.loadSeriesByUID([seriesUID])
         
 #
 # Autoelectrodes
@@ -1684,12 +1076,29 @@ NameError: name 'PlotWindow' is not defined
         # Additional widgets can be instantiated manually and added to self.layout.
         uiWidget = slicer.util.loadUI(self.resourcePath('UI/Autoelectrodes.ui'))
         self.layout.addWidget(uiWidget)
-        self.ui = slicer.util.childWidgetVariables(uiWidget)
+        # self.ui = slicer.util.childWidgetVariables(uiWidget)
         
-        # Verify widget loading
-        if not hasattr(self.ui, 'DirectoryButton_saveBundle'):
-            logging.error("Failed to load DirectoryButton_saveBundle from UI file")
-            return
+
+        def print_all_children(widget, level=0):
+            try:
+                name = widget.objectName
+            except:
+                name = 'NO NAME'
+            print("  " * level + f"{name} ({type(widget).__name__})")
+            for child in widget.children():
+                print_all_children(child, level + 1)
+
+        # print("🔍 Full UI tree:")
+        # print_all_children(uiWidget)
+
+        print("🔍 UI children:")
+        # print(uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.inputsCollapsibleButton.applyButton) #.children()
+        
+
+        # # Verify widget loading
+        # if not hasattr(self.ui, 'DirectoryButton_saveBundle'):
+        #     logging.error("Failed to load DirectoryButton_saveBundle from UI file")
+        #     return
 
         # Set scene in MRML widgets. Make sure that in Qt designer the top-level qMRMLWidget's
         # "mrmlSceneChanged(vtkMRMLScene*)" signal in is connected to each MRML widget's.
@@ -1710,36 +1119,72 @@ NameError: name 'PlotWindow' is not defined
 
         # These connections ensure that whenever user changes some settings on the GUI, that is saved in the MRML scene
         # (in the selected parameter node).
-        self.ui.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        self.ui.electrodesSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        self.ui.fixedVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        self.ui.inputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        self.ui.outputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        self.ui.checkBox_transfer.connect("toggled(bool)", self.updateParameterNodeFromGUI)
-        self.ui.DirectoryButton.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
-        self.ui.DirectoryButton_subject.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
-        self.ui.DirectoryButton_saveBundle.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
+        # self.ui.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.inputSelector = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.inputsCollapsibleButton.inputSelector
+        self.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        # self.ui.electrodesSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.electrodesSelector = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton_2.electrodesSelector
+        self.electrodesSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        # self.ui.fixedVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.fixedVolumeSelector = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton.fixedVolumeSelector
+        self.fixedVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        # self.ui.inputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.inputListSelector = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.copytransferCollapsibleButton.inputListSelector
+        self.inputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        # self.ui.outputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.outputListSelector = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.copytransferCollapsibleButton.outputListSelector
+        self.outputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        # self.ui.checkBox_transfer.connect("toggled(bool)", self.updateParameterNodeFromGUI)
+        self.checkBox_transfer = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.copytransferCollapsibleButton.transferCollapsibleButton.checkBox_transfer
+        self.checkBox_transfer.connect("toggled(bool)", self.updateParameterNodeFromGUI)
+        # self.ui.DirectoryButton.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
+        self.DirectoryButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton.DirectoryButton
+        self.DirectoryButton.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
+        # self.ui.DirectoryButton_subject.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
+        self.DirectoryButton_subject = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton_2.DirectoryButton_subject
+        self.DirectoryButton_subject.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
+        # self.ui.DirectoryButton_saveBundle.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
+        self.DirectoryButton_saveBundle = uiWidget.TabWidget.qt_tabwidget_stackedwidget.exportTab.exportGroupBox.DirectoryButton_saveBundle
+        self.DirectoryButton_saveBundle.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
+        # self.ui.DirectoryButton_rawFolder.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
+        self.DirectoryButton_rawFolder = uiWidget.TabWidget.qt_tabwidget_stackedwidget.importTab.ImportGroupBox.DirectoryButton_rawFolder
+        self.DirectoryButton_rawFolder.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
         
         # Other inputs
-        self.ui.saveFileName.editingFinished.connect(self.updateParameterNodeFromGUI)
-        
+        # self.ui.saveFileName.editingFinished.connect(self.updateParameterNodeFromGUI)
+        self.saveFileName = uiWidget.TabWidget.qt_tabwidget_stackedwidget.exportTab.exportGroupBox.saveFileName
+        self.saveFileName.connect('editingFinished()', self.updateParameterNodeFromGUI)
+
         # Visualization advanced inputs
-        self.ui.visulizeMarkupsWidget.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        self.ui.templateColor.activated.connect(self.updateParameterNodeFromGUI)
-        self.ui.templateOpacity.activated.connect(self.updateParameterNodeFromGUI)
-        self.ui.templateText.activated.connect(self.updateParameterNodeFromGUI)
-        self.ui.templateOrder.activated.connect(self.updateParameterNodeFromGUI)
-        self.ui.checkBox_RemoveDuplicates.connect("toggled(bool)", self.updateParameterNodeFromGUI)
-        self.ui.applySettingsButton.connect('clicked(bool)', self.onApplyTemplateSettingsButton)
+        # self.ui.templateName.activated.connect(self.updateParameterNodeFromGUI)
+        self.templateName = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.visualizationCollapsibleButton.CollapsibleGroupBox.templateName
+        self.templateName.connect('activated(QString)', self.updateParameterNodeFromGUI)    
+        # self.ui.applySettingsButton.connect('clicked(bool)', self.onApplyTemplateSettingsButton)
+        self.applySettingsButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.visualizationCollapsibleButton.CollapsibleGroupBox.applySettingsButton
+        self.applySettingsButton.connect('clicked(bool)', self.onApplyTemplateSettingsButton)
          
         # Buttons
-        self.ui.applyButton.connect('clicked(bool)', self.onApplyButton)
-        self.ui.pushButton.connect('clicked(bool)', self.onPushButton)
-        self.ui.copyButton.connect('clicked(bool)', self.onCopyButton)
-        self.ui.pushButton_mapping.connect('clicked(bool)', self.onPushButton_mapping)
-        self.ui.saveTableButton.connect('clicked(bool)', self.onSaveTableButton)
-        self.ui.saveBundleButton.connect('clicked(bool)', self.onSaveBundleButton)
-        self.ui.openEDFButton.connect('clicked(bool)', self.openEDFviewer)
+        self.applyButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.inputsCollapsibleButton.applyButton
+        self.applyButton.connect('clicked(bool)', self.onApplyButton)
+
+        # self.ui.pushButton.connect('clicked(bool)', self.onPushButton)
+        self.pushButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton.pushButton
+        self.pushButton.connect('clicked(bool)', self.onPushButton)
+        # self.ui.copyButton.connect('clicked(bool)', self.onCopyButton)
+        self.copyButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.copytransferCollapsibleButton.copyButton
+        self.copyButton.connect('clicked(bool)', self.onCopyButton)
+        # self.ui.pushButton_mapping.connect('clicked(bool)', self.onPushButton_mapping)
+        self.pushButton_mapping = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton.pushButton_mapping
+        self.pushButton_mapping.connect('clicked(bool)', self.onPushButton_mapping) 
+        # self.ui.saveTableButton.connect('clicked(bool)', self.onSaveTableButton)
+        self.saveTableButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton_2.saveTableButton
+        self.saveTableButton.connect('clicked(bool)', self.onSaveTableButton)
+        # self.ui.saveBundleButton.connect('clicked(bool)', self.onSaveBundleButton)
+        self.saveBundleButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.exportTab.exportGroupBox.saveBundleButton
+        self.saveBundleButton.connect('clicked(bool)', self.onSaveBundleButton)
+        # self.ui.ImportPatientButton.connect('clicked(bool)', self.onImportPatientButton)
+        self.ImportPatientButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.importTab.ImportGroupBox.ImportPatientButton
+        self.ImportPatientButton.connect('clicked(bool)', self.onImportPatientButton)   
 
     def cleanup(self):
         """
@@ -1827,45 +1272,47 @@ NameError: name 'PlotWindow' is not defined
         self._updatingGUIFromParameterNode = True
 
         # Update node selectors and sliders
-        self.ui.inputSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
-        self.ui.electrodesSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputElectrodes"))
-        self.ui.fixedVolumeSelector.setCurrentNode(self._parameterNode.GetNodeReference("fixedVolume"))
-        self.ui.checkBox_transfer.checked = (self._parameterNode.GetParameter("Transfer") == "false")
-        self.ui.inputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputListVolume"))
-        self.ui.outputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputListVolume"))
-        self.ui.DirectoryButton.directory = str(self._parameterNode.GetParameter("Directory"))
-        self.ui.DirectoryButton_subject.directory = str(self._parameterNode.GetParameter("Directory_Subject"))
-        self.ui.DirectoryButton_saveBundle.directory = str(self._parameterNode.GetParameter("saveDirectory"))
-        self.ui.saveFileName.text = str(self._parameterNode.GetParameter("saveFileName"))
-        
-        
-        self.ui.visulizeMarkupsWidget.setCurrentNode(self._parameterNode.GetNodeReference("visualizationInputVolume"))
-        self.ui.templateColor.setCurrentText(str(self._parameterNode.GetParameter("templateColor")))
-        self.ui.templateOpacity.setCurrentText(str(self._parameterNode.GetParameter("templateOpacity")))
-        self.ui.templateText.setCurrentText(str(self._parameterNode.GetParameter("templateText")))
-        self.ui.templateOrder.setCurrentText(str(self._parameterNode.GetParameter("templateOrder")))
-        self.ui.checkBox_RemoveDuplicates.checked = (self._parameterNode.GetParameter("RemoveDuplicates") == "false")
+        self.inputSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
+        self.electrodesSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputElectrodes"))
+        self.fixedVolumeSelector.setCurrentNode(self._parameterNode.GetNodeReference("fixedVolume"))
+        self.checkBox_transfer.checked = (self._parameterNode.GetParameter("Transfer") == "false")
+        self.inputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputListVolume"))
+        self.outputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputListVolume"))
+        self.DirectoryButton.directory = str(self._parameterNode.GetParameter("Directory"))
+        self.DirectoryButton_subject.directory = str(self._parameterNode.GetParameter("Directory_Subject"))
+        self.DirectoryButton_saveBundle.directory = str(self._parameterNode.GetParameter("saveDirectory"))
+        self.DirectoryButton_rawFolder.directory = str(self._parameterNode.GetParameter("rawDirectory"))
+        self.saveFileName.text = str(self._parameterNode.GetParameter("saveFileName"))
+                
+        self.visulizeMarkupsWidget.setCurrentNode(self._parameterNode.GetNodeReference("visualizationInputVolume"))
+        self.templateName.setCurrentText(str(self._parameterNode.GetParameter("templateName")))
 
         # Update buttons states and tooltips (Enable)
         if self._parameterNode.GetNodeReference("InputVolume"):
-            self.ui.applyButton.toolTip = "Generate electrodes"
-            self.ui.applyButton.enabled = True
+            self.applyButton.toolTip = "Generate electrodes"
+            self.applyButton.enabled = True
         else:
-            self.ui.applyButton.toolTip = "Select input volume node"
-            self.ui.applyButton.enabled = False
+            self.applyButton.toolTip = "Select input volume node"
+            self.applyButton.enabled = False
             
         # Update buttons states and tooltips
         if self._parameterNode.GetNodeReference("InputElectrodes"):
-            self.ui.saveTableButton.toolTip = "Generate table"
-            self.ui.saveTableButton.enabled = True
+            self.saveTableButton.toolTip = "Generate table"
+            self.saveTableButton.enabled = True
         else:
-            self.ui.saveTableButton.toolTip = "Select input"
-            self.ui.saveTableButton.enabled = False
+            self.saveTableButton.toolTip = "Select input"
+            self.saveTableButton.enabled = False
         
         if self._parameterNode.GetParameter("saveDirectory"):
-            self.ui.saveBundleButton.enabled = True
+            self.saveBundleButton.enabled = True
         else:
-            self.ui.saveBundleButton.enabled = False
+            self.saveBundleButton.enabled = False
+
+        if self._parameterNode.GetParameter("rawDirectory"):
+            self.ImportPatientButton.enabled = True
+        else:
+            self.ImportPatientButton.enabled = False
+        
         
         # All the GUI updates are done
         self._updatingGUIFromParameterNode = False
@@ -1881,24 +1328,20 @@ NameError: name 'PlotWindow' is not defined
 
         wasModified = self._parameterNode.StartModify()  # Modify all properties in a single batch
 
-        self._parameterNode.SetNodeReferenceID("InputVolume", self.ui.inputSelector.currentNodeID)
-        self._parameterNode.SetNodeReferenceID("InputElectrodes", self.ui.electrodesSelector.currentNodeID)
-        self._parameterNode.SetNodeReferenceID("fixedVolume", self.ui.fixedVolumeSelector.currentNodeID)
-        self._parameterNode.SetNodeReferenceID("InputListVolume", self.ui.inputListSelector.currentNodeID)
-        self._parameterNode.SetNodeReferenceID("OutputListVolume", self.ui.outputListSelector.currentNodeID)
-        self._parameterNode.SetParameter("Directory", str(self.ui.DirectoryButton.directory))
-        self._parameterNode.SetParameter("Directory_Subject", str(self.ui.DirectoryButton_subject.directory))
-        self._parameterNode.SetParameter("saveDirectory", str(self.ui.DirectoryButton_saveBundle.directory))
-        self._parameterNode.SetParameter("Transfer", "true" if self.ui.checkBox_transfer.checked else "false")
-        self._parameterNode.SetParameter("saveFileName", str(self.ui.saveFileName.text))
-        
-        
+        self._parameterNode.SetNodeReferenceID("InputVolume", self.inputSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("InputElectrodes", self.electrodesSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("fixedVolume", self.fixedVolumeSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("InputListVolume", self.inputListSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("OutputListVolume", self.outputListSelector.currentNodeID)
+        self._parameterNode.SetParameter("Directory", str(self.DirectoryButton.directory))
+        self._parameterNode.SetParameter("Directory_Subject", str(self.DirectoryButton_subject.directory))
+        self._parameterNode.SetParameter("saveDirectory", str(self.DirectoryButton_saveBundle.directory))
+        self._parameterNode.SetParameter("rawDirectory", str(self.DirectoryButton_rawFolder.directory))
+        self._parameterNode.SetParameter("Transfer", "true" if self.checkBox_transfer.checked else "false")
+        self._parameterNode.SetParameter("saveFileName", str(self.saveFileName.text))
+                
         # self._parameterNode.SetNodeReferenceID("visualizationInputVolume", self.ui.visulizeMarkupsWidget.currentNode().currentNodeID)
-        self._parameterNode.SetParameter("templateColor", str(self.ui.templateColor.currentText))
-        self._parameterNode.SetParameter("templateOpacity", str(self.ui.templateOpacity.currentText))
-        self._parameterNode.SetParameter("templateText", str(self.ui.templateText.currentText))
-        self._parameterNode.SetParameter("templateOrder", str(self.ui.templateOrder.currentText))
-        self._parameterNode.SetParameter("RemoveDuplicates", "true" if self.ui.checkBox_RemoveDuplicates.checked else "false")
+        self._parameterNode.SetParameter("templateName", str(self.templateName.currentText))
 
         self._parameterNode.EndModify(wasModified)
 
@@ -1909,7 +1352,7 @@ NameError: name 'PlotWindow' is not defined
         with slicer.util.tryWithErrorDisplay("Failed to compute results.", waitCursor=True):
 
             # Compute output
-            fidNode = self.ui.inputSelector.currentNode()
+            fidNode = self.inputSelector.currentNode()
             
             # checked_mapping = self.ui.checkBox_mapping.checked
             # fixedVolumeNode = self.ui.fixedVolumeSelector.currentNode()
@@ -1920,58 +1363,55 @@ NameError: name 'PlotWindow' is not defined
         with slicer.util.tryWithErrorDisplay("Failed to compute results.", waitCursor=True):
 
             # Compute output
-            fixedVolumeNode = self.ui.fixedVolumeSelector.currentNode()
+            fixedVolumeNode = self.fixedVolumeSelector.currentNode()
             self.logic.regions(fixedVolumeNode)
             
-            destinyDirectory = self.ui.DirectoryButton.directory
+            destinyDirectory = self.DirectoryButton.directory
             self.logic.regions_parttwo(destinyDirectory)
     
     def onApplyTemplateSettingsButton(self):
         
-        electrodeList = self.ui.visulizeMarkupsWidget.currentNode()
+        electrodeList = self.visulizeMarkupsWidget.currentNode()
         
-        templateColor = self.ui.templateColor.currentText
-        templateOpacity = self.ui.templateOpacity.currentText
-        templateText = self.ui.templateText.currentText
-        templateOrder = self.ui.templateOrder.currentText
-        removeDuplicates = self.ui.checkBox_RemoveDuplicates.checked
+        templateName = self.templateName.currentText
         
-        self.logic.applyTemplate(templateColor, templateOpacity, templateText, templateOrder, removeDuplicates, electrodeList)
+        self.logic.applyTemplate(templateName)
     
     def onPushButton_mapping(self):
         
-        destinyDirectory = self.ui.DirectoryButton.directory
+        destinyDirectory = self.DirectoryButton.directory
         self.logic.regions_partthree(destinyDirectory)
         
             
     def onSaveTableButton(self):
         
-        destinyDirectory = self.ui.DirectoryButton_subject.directory
-        electrodesNode = self.ui.electrodesSelector.currentNode()        
+        destinyDirectory = self.DirectoryButton_subject.directory
+        electrodesNode = self.electrodesSelector.currentNode()        
         
         self.logic.save_info(destinyDirectory, electrodesNode)
         
     def onSaveBundleButton(self):
         
-        destinyDirectory = self.ui.DirectoryButton_saveBundle.directory
-        name_of_file = self.ui.saveFileName.text
+        destinyDirectory = self.DirectoryButton_saveBundle.directory
+        name_of_file = self.saveFileName.text
                 
         self.logic.save_Bundle(destinyDirectory, name_of_file)
-        
+    
+    def onImportPatientButton(self):
+
+        rawDirectory = self.DirectoryButton_rawFolder.directory
+        print(f"Importing patient data from: {rawDirectory}")
+
+        self.logic.import_patient(rawDirectory)
+
     def onCopyButton(self):
         
-        inputList = self.ui.inputListSelector.currentNode()
-        outputList = self.ui.outputListSelector.currentNode()
-        checked_transfer = self.ui.checkBox_transfer.checked
+        inputList = self.inputListSelector.currentNode()
+        outputList = self.outputListSelector.currentNode()
+        checked_transfer = self.checkBox_transfer.checked
         
         self.logic.copy_transfer(inputList, outputList, checked_transfer)
         
-    def openEDFviewer(self):
-        if not hasattr(self, 'edfViewer'):
-            # Pass None if slicer.util.mainWindow() is not a QWidget
-            self.edfViewer = EDFPopupWindow(parent=None)
-            self.edfViewer.setWindowFlags(QtCore.Qt.Window)
-        self.edfViewer.show()
 
 #
 # AutoelectrodesLogic
@@ -2020,41 +1460,107 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         stopTime = time.time()
         logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
     
-    def applyTemplate(self, templateColor, opacity, textBool, orderAs, removeDuplicates, electrodeList):
+
+    def update_all_markups(self):
+
+        # Get all fiducial markup nodes
+        markupNodes = slicer.util.getNodesByClass("vtkMRMLMarkupsFiducialNode")
+
+        for markupNode in markupNodes:
+            numPoints = markupNode.GetNumberOfControlPoints()
+            if numPoints == 0:
+                continue
+
+            # --- Determine color based on average X position ---
+            x_coords = []
+            for i in range(numPoints):
+                pos = [0.0, 0.0, 0.0]
+                markupNode.GetNthControlPointPositionWorld(i, pos)
+                x_coords.append(pos[0])
+            mean_x = sum(x_coords) / len(x_coords)
+            color = (1.0, 0.0, 0.0) if mean_x < 0 else (0.0, 0.0, 1.0)  # Red or Blue
+
+            # Set display properties
+            displayNode = markupNode.GetDisplayNode()
+            if displayNode:
+                displayNode.SetGlyphTypeFromString("Circle2D")
+                displayNode.SetSelectedColor(color)
+                displayNode.SetColor(color)
+
+            # Lock the markup node
+            markupNode.SetLocked(True)
+
+            # --- Reorder control points using natural sort on label ---
+            controlPoints = []
+            for i in range(numPoints):
+                pos = [0.0, 0.0, 0.0]
+                markupNode.GetNthControlPointPositionWorld(i, pos)
+                label = markupNode.GetNthControlPointLabel(i)
+                controlPoints.append((label, pos))
+
+            # Sort using natural order
+            controlPoints.sort(key=lambda x: natural_keys(x[0]))
+
+            # Remove and re-add in new order
+            markupNode.RemoveAllControlPoints()
+            for label, pos in controlPoints:
+                markupNode.AddControlPointWorld(*pos)
+                markupNode.SetNthControlPointLabel(markupNode.GetNumberOfControlPoints() - 1, label)
+    
+    def update_all_models(self):
+    
+        # Define color mapping based on keywords
+        color_map = {
+            "white": (1.0, 1.0, 1.0),               # White
+            "grey": (0.839, 0.839, 0.839),          # Silver (#d6d6d6)
+            "hyp": (0.0, 0.992, 1.0),               # Cyan (#00FDFF)
+            "amy": (1.0, 0.984, 0.0)                # Yellow (#FFFB00)
+        }
+
+        # Go through all model nodes
+        modelNodes = slicer.util.getNodesByClass("vtkMRMLModelNode")
+
+        for modelNode in modelNodes:
+            name = modelNode.GetName().lower()
+            displayNode = modelNode.GetDisplayNode()
+
+            if not displayNode:
+                continue
+
+            # --- Set color ---
+            for key, rgb in color_map.items():
+                if key in name:
+                    displayNode.SetColor(rgb)
+                    displayNode.SetSelectedColor(rgb)
+                    break  # Use the first match found
+
+            # --- Set opacity ---
+            displayNode.SetOpacity(0.15)
+
+            # --- Set visibility ---
+            if any(key in name for key in ["grey", "hyp", "amy"]):
+                displayNode.SetVisibility(True)
+            else:
+                displayNode.SetVisibility(False)
+
+
+    def applyTemplate(self, templateName):
         
-        # Change variables from text to usable vars 
-        opacity = int(opacity[:-1])/100
-        textBool = True if textBool == 'Yes' else False
-        
-        # Change colors according to the selected template
-        if templateColor == 'Selected/Unselected (White/Black)':
-            # Set color to be white if selected
-            electrodeList.GetDisplayNode().SetSelectedColor([0/255,0/255,0/255])
-            # or black if unselected
-            electrodeList.GetDisplayNode().SetColor([255/255,255/255,255/255])
-        if templateColor == 'Left  hemisphere (Red)':
-            electrodeList.GetDisplayNode().SetColor([170/255,0/255,0/255])
-            electrodeList.GetDisplayNode().SetSelectedColor([170/255,0/255,0/255])
-        if templateColor == 'Right hemisphere (Blue)':
-            electrodeList.GetDisplayNode().SetColor([0/255,85/255,225/255])
-            electrodeList.GetDisplayNode().SetSelectedColor([0/255,85/255,225/255])
-        
-        # Adjust the value for the desired text size
-        if textBool:
-            electrodeList.GetDisplayNode().SetTextScale(3.0) 
+        """
+        Apply a template to the selected markups node.
+        :param templateName: Name of the template to apply
+        """
+
+        # Apply the template
+        if templateName == "EpiDB":
+            self.update_all_markups()
+            self.update_all_models()
+
+        elif templateName == "Template2":
+            # Apply Template2 settings
+            pass
         else:
-            electrodeList.GetDisplayNode().SetTextScale(0.0) 
-            
-        # Change the value of opacity 
-        electrodeList.GetDisplayNode().SetOpacity(opacity)
-        
-        # Change size of the fiducials
-        electrodeList.GetDisplayNode().SetUseGlyphScale(False)  # Ensures glyph size is not relative to the scene
-        # Set the glyph size to 3.0 mm
-        electrodeList.GetDisplayNode().SetGlyphSize(3.0)
-        
-        # Lock the Markup Node so that the user cannot edit it through the 3D view
-        electrodeList.SetLocked(True)
+            logging.error(f"Unknown template: {templateName}")
     
     def regions(self,fixedVolumeNode):
         
@@ -2099,7 +1605,9 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         """
         
         global asegVolumeNode, asegVoxelArray
-        asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
+        asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('brain_segmentation')
+        if not asegVolumeNode: 
+            asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
         asegVoxelArray = slicer.util.arrayFromVolume(asegVolumeNode)
         
         # All markup's names and positions in RAS coordinates
@@ -2164,9 +1672,13 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         number_nodes_outside_brain_Left = number_nodes_outside_brain - number_nodes_outside_brain_Right
 
         # Obtain volume of the hemispheres 
-        right_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('rhp')
+        right_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('rh_grey')
+        if not right_hemisphere_VolumeNode: 
+            right_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('rhp')
         right_hemisphere_Volume = computeBrainVolume(right_hemisphere_VolumeNode)
-        left_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('lhp')
+        left_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('lh_grey')
+        if not left_hemisphere_VolumeNode:
+            left_hemisphere_VolumeNode = slicer.mrmlScene.GetFirstNodeByName('lhp')
         left_hemisphere_Volume = computeBrainVolume(left_hemisphere_VolumeNode)
         brain_Volume = right_hemisphere_Volume + left_hemisphere_Volume
         
@@ -2196,14 +1708,244 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
                 
         except:
             logging.error("Saving failed")
-            
+
+    def import_patient(self, rawDirectory):
+
+        """
+        Import patient data from a raw folder.
+        :param rawDirectory: Directory containing the raw patient data
+        """
+
+        # Folders where the data is expected
+        dicom_folder = os.path.join(rawDirectory, 'ctp')
+        freesurfer_folder = os.path.join(rawDirectory, 'fsfolder')
+        fsmri_folder = os.path.join(freesurfer_folder, 'mri')
+        fsurf_folder = os.path.join(freesurfer_folder, 'surf')
+
+        # Load DICOM data
+        importAndLoadDICOMFolder(dicom_folder)
+
+        # IMPORTANT: Since the DICOM is the only vtkMRMLScalarVolumeNode we look for it and change the name (it cannot be changed in the importAndLoadDICOMFolder function)
+        # This should be always the first volume loaded, so it is safe to do this
+        dicomVolumeNode = slicer.util.getNodesByClass("vtkMRMLScalarVolumeNode")[0]
+        if dicomVolumeNode:
+            dicomVolumeNode.SetName("CT_postElectrodes")
+
+        # Load models
+        directories = [fsmri_folder, fsurf_folder]
+        for directory in directories:
+
+            for filename in os.listdir(directory):
+
+                print(f"Processing file: {filename}")
+
+                file_path = os.path.join(directory, filename)
+
+                # Load the segmentation file
+                if filename.endswith('.mgz') and 'aseg' in filename.lower():
+                    
+                    # Load aseg as labelmap volume
+                    labelmapNode = slicer.util.loadVolume(file_path, {'labelmap': True})
+                    labelmapNode.SetName("aseg")
+
+                    # Set color table to FreeSurfer labels
+                    fsColorNode = slicer.util.getNode('FreeSurferLabels')
+                    labelmapNode.GetDisplayNode().SetAndObserveColorNodeID(fsColorNode.GetID())
+
+                    # # Create a segmentation node and import labelmap
+                    # segmentationNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode", "aseg_segmentation")
+                    # slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(labelmapNode, segmentationNode)
+
+                    # # Optional: show the segmentation
+                    # segmentationNode.CreateDefaultDisplayNodes()
+                    # segmentationNode.GetDisplayNode().SetVisibility2DFill(True)
+
+                if filename.endswith('.mgz') and ('norm' in filename.lower() or 'T1' in filename):
+                    print(f"Loading volume: {filename}")
+                    volumeNode = slicer.util.loadVolume(file_path)
+                    if 'norm' in filename.lower():
+                        volumeNode.SetName("brain")
+                    elif 'T1' in filename:
+                        volumeNode.SetName('MRI_T1')  # Use filename without extension as node name
+
+                # Load cortical surfaces
+                if filename.endswith('.pial') or filename.endswith('.white'):
+                    parts = filename.split('.')
+                    hemi, surfaceType = parts  
+                    baseName = f"{hemi}_{surfaceType}"
+
+                    # Read file content
+                    logic = NiBabelModelIOLogic()   
+                    loadedNode = logic.createAndReadModelNode(file_path, baseName)
+
+                    loadedNode.CreateDefaultDisplayNodes()
+                        
+                #         print(f"Loading model: {modelName} from {file_path}")
+
+
+
+
     def save_Bundle(self, destinationDirectory, name_of_file):
         
-        if slicer.util.saveScene(destinationDirectory+"/"+name_of_file+".mrb"):
-            logging.info("File saved to: {0}".format(destinationDirectory))
-        else:
-            logging.error("Files saving failed")
+        # Create folder of the patient
+        destinationDirectory = os.path.join(destinationDirectory, name_of_file)
+
+        namesOfFilesToSearch = ['aseg',
+                                '3D',
+                                'brain',
+                                'norm',
+                                'lhp',
+                                'lh_pial',
+                                'lh_grey',
+                                'rhp',
+                                'rh_pial',
+                                'rh_grey',
+                                'lhw',
+                                'lh_white',
+                                'rhw',
+                                'rh_white',
+                                'pet.3d',
+                                'pet.3D',
+                                'PET.3D',
+                                'PET.3d',
+                                'ct.3d',
+                                'CT.3d',
+                                'ct.3D',
+                                'CT.3D',
+                                'ctp.3d',
+                                'CTp.3d',
+                                'ctp.3D',
+                                'CTp.3D',
+                                'res',
+                                'resection',
+                                'real-L','real-R',
+                                'real-L-P','real-R-P',
+                                'electrodes_L','electrodes_R',
+                                'electrodes_L_Grey_Matter','electrodes_R_Grey_Matter',
+                                'Bipolar-real-L','Bipolar-real-R',
+                                'Bipolar-real-L-P','Bipolar-real-R-P',
+                                'Bipolar_electrodes_L','Bipolar_electrodes_R',
+                                'Bipolar_electrodes_L_Grey_Matter','Bipolar_electrodes_R_Grey_Matter',
+                                'etc','ETC']
         
+        nrrdFiles = ['aseg','3D', 'brain', 'norm',
+                     'pet.3d','pet.3D','PET.3D','PET.3d',
+                     'ct.3d','CT.3d','ct.3D','CT.3D',
+                     'ctp.3d','CTp.3d','ctp.3D','CTp.3D',]
+        
+        vtkFiles = ['lhp','lh_pial', 'lh_grey',
+                    'rhp','rh_pial', 'rh_grey',
+                    'lhw','lh_white',
+                    'rhw','rh_white',
+                    'res','resection']
+        
+        mrkJsonFiles = ['real-L','real-R',
+                        'electrodes_L','electrodes_R',
+                        'real-L-P','real-R-P',
+                        'electrodes_L_Grey_Matter','electrodes_R_Grey_Matter',
+                        'Bipolar-real-L','Bipolar-real-R',
+                        'Bipolar-real-L-P','Bipolar-real-R-P',
+                        'Bipolar_electrodes_L','Bipolar_electrodes_R',
+                        'Bipolar_electrodes_L_Grey_Matter','Bipolar_electrodes_R_Grey_Matter',
+                        'etc','ETC']
+        
+        renamingDict = {'aseg':'brain_segmentation',
+                        '3D': 'MRI_T1',
+                        'brain':'brain',
+                        'norm':'brain',
+                        'lhp':'lh_grey',
+                        'lh_pial':'lh_grey',
+                        'lh_grey':'lh_grey',
+                        'rhp':'rh_grey',
+                        'rh_pial':'rh_grey',
+                        'rh_grey':'rh_grey',
+                        'lhw':'lh_white',
+                        'lh_white':'lh_white',
+                        'rhw':'rh_white',
+                        'rh_white':'rh_white',
+                        'pet.3d':'PET',
+                        'pet.3D':'PET',
+                        'PET.3D':'PET',
+                        'PET.3d':'PET',
+                        'ct.3d':'CT',
+                        'CT.3d':'CT',
+                        'ct.3D':'CT',
+                        'CT.3D':'CT',
+                        'ctp.3d':'CT_postElectrodes',
+                        'CTp.3d':'CT_postElectrodes',
+                        'ctp.3D':'CT_postElectrodes',
+                        'CTp.3D':'CT_postElectrodes',
+                        'ctps.3d':'CT_postElectrodes',
+                        'CTps.3d':'CT_postElectrodes',
+                        'ctps.3D':'CT_postElectrodes',
+                        'CTps.3D':'CT_postElectrodes',
+                        'res':'resection',
+                        'resection':'resection',
+                        'real-L':'electrodes_L',
+                        'real-R':'electrodes_R',
+                        'real-L-P':'electrodes_L_grey',
+                        'real-R-P':'electrodes_L_grey',
+                        'electrodes_L':'electrodes_L',
+                        'electrodes_R':'electrodes_R',
+                        'electrodes_L_Grey_Matter':'electrodes_L_grey',
+                        'electrodes_R_Grey_Matter':'electrodes_R_grey',
+                        'Bipolar-real-L':'electrodes_bipolar_L',
+                        'Bipolar-real-R':'electrodes_bipolar_R',
+                        'Bipolar-real-L-P':'electrodes_bipolar_L_grey',
+                        'Bipolar-real-R-P':'electrodes_bipolar_R_grey',
+                        'Bipolar_electrodes_L':'electrodes_bipolar_L',
+                        'Bipolar_electrodes_R':'electrodes_bipolar_R',
+                        'Bipolar_electrodes_L_Grey_Matter':'electrodes_bipolar_L_grey',
+                        'Bipolar_electrodes_R_Grey_Matter':'electrodes_bipolar_R_grey',
+                        'etc':'ETC',
+                        'ETC':'ETC'}
+
+        # Make sure that the transforms are hardened before saving
+        volumeNodes = slicer.util.getNodesByClass("vtkMRMLVolumeNode")
+        for volumeNode in volumeNodes:
+            transformNode = volumeNode.GetParentTransformNode()
+            if transformNode:
+                print(f"Harden transform for volume: {volumeNode.GetName()}")
+                slicer.vtkSlicerTransformLogic().hardenTransform(volumeNode)
+        
+        # Save the files
+        for nameOfFile in namesOfFilesToSearch:
+            print(f"\nSearching for: {nameOfFile}")
+
+            if slicer.util.getFirstNodeByName(nameOfFile):
+                # Locate the nodes in the scene
+                selectedNode = slicer.util.getFirstNodeByName(nameOfFile)
+                print(f"Found node: {selectedNode.GetName()} ")
+                
+                # Select new name
+                newFileName = renamingDict[nameOfFile]
+
+                # Select file format
+                if nameOfFile in nrrdFiles:
+                    file_extension = '.nrrd'
+                    print(f"File format: {file_extension}")
+                if nameOfFile in vtkFiles:
+                    file_extension = '.vtk'
+                    print(f"File format: {file_extension}")
+                if nameOfFile in mrkJsonFiles:
+                    file_extension = '.mrk.json'
+                    print(f"File format: {file_extension}")
+
+                # Stablish file path
+                if (file_extension == '.nrrd') or (file_extension == '.vtk'):
+                    new_file_path = os.path.normpath(os.path.join(destinationDirectory, 'anatomy', f"{newFileName}{file_extension}"))
+                if file_extension == '.mrk.json':
+                    new_file_path = os.path.normpath(os.path.join(destinationDirectory, 'electrodes', f"{newFileName}{file_extension}"))
+
+                # Save the node with the new name
+                if slicer.util.saveNode(selectedNode, new_file_path):
+                    print(f"'{selectedNode.GetName()}' saved successfully as {new_file_path}")
+                else:
+                    print(f"Failed to save '{selectedNode.GetName()}' as {new_file_path}")
+
+            else:
+                pass
+            
 
 #
 # AutoelectrodesTest
