@@ -6,638 +6,617 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>350</width>
+    <width>341</width>
     <height>847</height>
    </rect>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
+  <layout class="QVBoxLayout" name="mainLayout">
    <item>
-    <widget class="ctkCollapsibleButton" name="inputsCollapsibleButton">
-     <property name="maximumSize">
-      <size>
-       <width>16777215</width>
-       <height>90</height>
-      </size>
+    <widget class="QTabWidget" name="TabWidget">
+     <property name="currentIndex">
+      <number>1</number>
      </property>
-     <property name="text">
-      <string>Autoelectrodes</string>
-     </property>
-     <property name="collapsed">
-      <bool>false</bool>
-     </property>
-     <layout class="QFormLayout" name="formLayout_2">
-      <item row="0" column="0">
-       <widget class="QLabel" name="label">
-        <property name="toolTip">
-         <string>List where the initial and last contact of the electrodes are defined.</string>
-        </property>
-        <property name="text">
-         <string>Input electrodes:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="qMRMLNodeComboBox" name="inputSelector">
-        <property name="enabled">
-         <bool>true</bool>
-        </property>
-        <property name="toolTip">
-         <string>Pick the list to generate the electrodes.</string>
-        </property>
-        <property name="nodeTypes">
-         <stringlist>
-          <string>vtkMRMLMarkupsFiducialNode</string>
-         </stringlist>
-        </property>
-        <property name="showHidden">
-         <bool>false</bool>
-        </property>
-        <property name="showChildNodeTypes">
-         <bool>false</bool>
-        </property>
-        <property name="addEnabled">
-         <bool>false</bool>
-        </property>
-        <property name="removeEnabled">
-         <bool>false</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="1">
-       <widget class="QPushButton" name="applyButton">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="toolTip">
-         <string>Generate the position of all the contacts of each electrode.</string>
-        </property>
-        <property name="text">
-         <string>Generate electrodes</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="ctkCollapsibleButton" name="visualizationCollapsibleButton">
-     <property name="maximumSize">
-      <size>
-       <width>16777215</width>
-       <height>16777215</height>
-      </size>
-     </property>
-     <property name="text">
-      <string>Visualization</string>
-     </property>
-     <property name="collapsed">
-      <bool>true</bool>
-     </property>
-     <layout class="QVBoxLayout" name="verticalLayout_2">
-      <item>
-       <widget class="qSlicerSimpleMarkupsWidget" name="visulizeMarkupsWidget">
-        <property name="enabled">
-         <bool>true</bool>
-        </property>
-        <property name="mouseTracking">
-         <bool>false</bool>
-        </property>
-        <property name="tabletTracking">
-         <bool>false</bool>
-        </property>
-        <property name="acceptDrops">
-         <bool>false</bool>
-        </property>
-        <property name="inputMethodHints">
-         <set>Qt::ImhNone</set>
-        </property>
-        <property name="enterPlaceModeOnNodeChange">
-         <bool>false</bool>
-        </property>
-        <property name="jumpToSliceEnabled">
-         <bool>true</bool>
-        </property>
-        <property name="nodeSelectorVisible">
-         <bool>false</bool>
-        </property>
-        <property name="optionsVisible">
-         <bool>false</bool>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="ctkCollapsibleGroupBox" name="CollapsibleGroupBox">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="title">
-         <string>Advanced settings</string>
-        </property>
-        <property name="collapsed">
-         <bool>false</bool>
-        </property>
-        <layout class="QFormLayout" name="formLayout_3">
-         <item row="0" column="0">
-          <widget class="QLabel" name="label_3">
-           <property name="text">
-            <string>Template:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="1">
-          <widget class="QComboBox" name="templateColor">
-           <property name="enabled">
-            <bool>true</bool>
-           </property>
-           <property name="editable">
-            <bool>false</bool>
-           </property>
-           <property name="currentText">
-            <string>None</string>
-           </property>
-           <item>
-            <property name="text">
-             <string>None</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>Left  hemisphere (Red)</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>Right hemisphere (Blue)</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>Selected/Unselected (White/Black)</string>
-            </property>
-           </item>
-          </widget>
-         </item>
-         <item row="1" column="0">
-          <widget class="QLabel" name="label_9">
-           <property name="text">
-            <string>Opacity:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="1">
-          <widget class="QComboBox" name="templateOpacity">
-           <item>
-            <property name="text">
-             <string>100%</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>50%</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>20%</string>
-            </property>
-           </item>
-          </widget>
-         </item>
-         <item row="2" column="0">
-          <widget class="QLabel" name="label_10">
-           <property name="text">
-            <string>Text:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1">
-          <widget class="QComboBox" name="templateText">
-           <item>
-            <property name="text">
-             <string>Yes</string>
-            </property>
-           </item>
-           <item>
-            <property name="text">
-             <string>No</string>
-            </property>
-           </item>
-          </widget>
-         </item>
-         <item row="3" column="0">
-          <widget class="QLabel" name="label_11">
-           <property name="text">
-            <string>Order:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="1">
-          <widget class="QComboBox" name="templateOrder">
-           <item>
-            <property name="text">
-             <string>Alphanumerical</string>
-            </property>
-           </item>
-          </widget>
-         </item>
-         <item row="4" column="1">
-          <widget class="QCheckBox" name="checkBox_RemoveDuplicates">
-           <property name="text">
-            <string>Remove duplicates</string>
-           </property>
-           <property name="autoExclusive">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item row="5" column="1">
-          <widget class="QPushButton" name="applySettingsButton">
-           <property name="text">
-            <string>Apply settings</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item>
-       <widget class="ctkCollapsibleButton" name="CollapsibleButton">
-        <property name="text">
-         <string>CollapsibleButton</string>
-        </property>
-        <widget class="QWidget" name="verticalLayoutWidget">
-         <property name="geometry">
-          <rect>
-           <x>90</x>
-           <y>100</y>
-           <width>2</width>
-           <height>2</height>
-          </rect>
+     <widget class="QWidget" name="importTab">
+      <attribute name="title">
+       <string>Import</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="secondTabLayout">
+       <item>
+        <widget class="QGroupBox" name="ImportGroupBox">
+         <property name="title">
+          <string>Select raw directory to import:</string>
          </property>
-         <layout class="QVBoxLayout" name="verticalLayout_4"/>
+         <layout class="QGridLayout" name="gridLayout" rowstretch="0,0">
+          <property name="sizeConstraint">
+           <enum>QLayout::SetDefaultConstraint</enum>
+          </property>
+          <item row="0" column="0">
+           <widget class="ctkDirectoryButton" name="DirectoryButton_rawFolder">
+            <property name="toolTip">
+             <string>Directory where the raw data of the patient is stored.</string>
+            </property>
+            <property name="elideMode">
+             <enum>Qt::ElideMiddle</enum>
+            </property>
+            <property name="options">
+             <set>ctkDirectoryButton::ShowDirsOnly</set>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QPushButton" name="ImportPatientButton">
+            <property name="text">
+             <string>Import patient</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
         </widget>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="ctkCollapsibleButton" name="recordingsCollapsibleButton">
-     <property name="text">
-      <string>EDF Viewer</string>
-     </property>
-     <property name="collapsed">
-      <bool>false</bool>
-     </property>
-     <layout class="QVBoxLayout" name="verticalLayout_3">
-      <item>
-       <widget class="ctkDirectoryButton" name="DirectoryButton_openEDF"/>
-      </item>
-      <item>
-       <widget class="ctkPushButton" name="openEDFButton">
-        <property name="text">
-         <string>Open EDF</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="ctkCollapsibleButton" name="outputsCollapsibleButton">
-     <property name="text">
-      <string>Mapping</string>
-     </property>
-     <property name="checked">
-      <bool>false</bool>
-     </property>
-     <property name="collapsed">
-      <bool>true</bool>
-     </property>
-     <layout class="QFormLayout" name="formLayout_4">
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_2">
-        <property name="text">
-         <string>Fixed volume:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="qMRMLNodeComboBox" name="fixedVolumeSelector">
-        <property name="toolTip">
-         <string>Pick the fixed volume for the registration of the anatomical templates of the electrodes. Ideally, it should be a cropped image of the T1 scan just depicting the brain.</string>
-        </property>
-        <property name="nodeTypes">
-         <stringlist>
-          <string>vtkMRMLScalarVolumeNode</string>
-         </stringlist>
-        </property>
-        <property name="showChildNodeTypes">
-         <bool>false</bool>
-        </property>
-        <property name="noneEnabled">
-         <bool>false</bool>
-        </property>
-        <property name="addEnabled">
-         <bool>false</bool>
-        </property>
-        <property name="removeEnabled">
-         <bool>false</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_4">
-        <property name="text">
-         <string>Destination folder:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="ctkDirectoryButton" name="DirectoryButton"/>
-      </item>
-      <item row="2" column="1">
-       <widget class="QPushButton" name="pushButton">
-        <property name="text">
-         <string>Register</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="1">
-       <widget class="QPushButton" name="pushButton_mapping">
-        <property name="text">
-         <string>Map electrodes</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="ctkCollapsibleButton" name="copytransferCollapsibleButton">
-     <property name="enabled">
-      <bool>true</bool>
-     </property>
-     <property name="font">
-      <font>
-       <weight>50</weight>
-       <bold>false</bold>
-       <kerning>true</kerning>
-      </font>
-     </property>
-     <property name="text">
-      <string>Copy/Transfer electrodes</string>
-     </property>
-     <property name="checkable">
-      <bool>true</bool>
-     </property>
-     <property name="checked">
-      <bool>false</bool>
-     </property>
-     <property name="collapsed">
-      <bool>true</bool>
-     </property>
-     <layout class="QFormLayout" name="formLayout">
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_inputlist">
-        <property name="text">
-         <string>Input list:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="qMRMLNodeComboBox" name="inputListSelector">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="font">
-         <font>
-          <weight>50</weight>
-          <bold>false</bold>
-          <kerning>true</kerning>
-         </font>
-        </property>
-        <property name="nodeTypes">
-         <stringlist>
-          <string>vtkMRMLMarkupsFiducialNode</string>
-         </stringlist>
-        </property>
-        <property name="noneEnabled">
-         <bool>false</bool>
-        </property>
-        <property name="removeEnabled">
-         <bool>false</bool>
-        </property>
-        <property name="editEnabled">
-         <bool>false</bool>
-        </property>
-        <property name="renameEnabled">
-         <bool>false</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="0">
-       <widget class="QLabel" name="label_6">
-        <property name="text">
-         <string>Output list: </string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="1">
-       <widget class="qMRMLNodeComboBox" name="outputListSelector">
-        <property name="enabled">
-         <bool>false</bool>
-        </property>
-        <property name="toolTip">
-         <string/>
-        </property>
-        <property name="nodeTypes">
-         <stringlist>
-          <string>vtkMRMLMarkupsFiducialNode</string>
-         </stringlist>
-        </property>
-        <property name="showChildNodeTypes">
-         <bool>false</bool>
-        </property>
-        <property name="noneEnabled">
-         <bool>false</bool>
-        </property>
-        <property name="addEnabled">
-         <bool>true</bool>
-        </property>
-        <property name="removeEnabled">
-         <bool>false</bool>
-        </property>
-        <property name="editEnabled">
-         <bool>false</bool>
-        </property>
-        <property name="renameEnabled">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item row="5" column="1">
-       <widget class="ctkCollapsibleButton" name="transferCollapsibleButton">
-        <property name="text">
-         <string>Enable transfer</string>
-        </property>
-        <property name="collapsed">
-         <bool>false</bool>
-        </property>
-        <property name="collapsedHeight">
-         <number>0</number>
-        </property>
-        <layout class="QFormLayout" name="formLayout_4">
-         <item row="0" column="0">
-          <widget class="QCheckBox" name="checkBox_transfer">
-           <property name="text">
-            <string>Transfer</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item row="9" column="0">
-       <widget class="QLabel" name="label_7">
-        <property name="text">
-         <string/>
-        </property>
-       </widget>
-      </item>
-      <item row="9" column="1">
-       <widget class="QPushButton" name="copyButton">
-        <property name="text">
-         <string>Copy / Tranfer</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="ctkCollapsibleButton" name="outputsCollapsibleButton_2">
-     <property name="text">
-      <string>Generate electrodes table</string>
-     </property>
-     <property name="checked">
-      <bool>false</bool>
-     </property>
-     <property name="collapsed">
-      <bool>true</bool>
-     </property>
-     <layout class="QFormLayout" name="formLayout_4">
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_5">
-        <property name="text">
-         <string>Electrodes:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="qMRMLNodeComboBox" name="electrodesSelector">
-        <property name="enabled">
-         <bool>true</bool>
-        </property>
-        <property name="nodeTypes">
-         <stringlist>
-          <string>vtkMRMLMarkupsFiducialNode</string>
-         </stringlist>
-        </property>
-        <property name="showChildNodeTypes">
-         <bool>false</bool>
-        </property>
-        <property name="hideChildNodeTypes">
-         <stringlist/>
-        </property>
-        <property name="addEnabled">
-         <bool>false</bool>
-        </property>
-        <property name="removeEnabled">
-         <bool>false</bool>
-        </property>
-        <property name="interactionNodeSingletonTag">
-         <string>Singleton</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_4">
-        <property name="text">
-         <string>Destination folder:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="ctkDirectoryButton" name="DirectoryButton_subject">
-        <property name="toolTip">
-         <string>Directory where all the information of the subject will be stored</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="1">
-       <widget class="QPushButton" name="saveTableButton">
-        <property name="toolTip">
-         <string>Save all files of the subject</string>
-        </property>
-        <property name="text">
-         <string>Generate and save tables</string>
-        </property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="ctkCollapsibleButton" name="saveBundleCollapsibleButton">
-     <property name="text">
-      <string>Save Medical Bundle</string>
-     </property>
-     <property name="collapsed">
-      <bool>true</bool>
-     </property>
-     <layout class="QFormLayout" name="formLayout_4">
-      <item row="0" column="0">
-       <widget class="QLabel" name="label_5">
-        <property name="text">
-         <string>Name:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QLineEdit" name="saveFileName"/>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="label_8">
-        <property name="text">
-         <string>Destination folder:</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="ctkDirectoryButton" name="DirectoryButton_saveBundle">
-        <property name="toolTip">
-         <string>Directory where all the information of the subject will be stored</string>
-        </property>
-       </widget>
-      </item>
-      <item row="2" column="1">
-       <widget class="QPushButton" name="saveBundleButton">
-        <property name="toolTip">
-         <string>Save all files of the subject</string>
-        </property>
-        <property name="text">
-         <string>Save</string>
-        </property>
-        <property name="checkable">
-         <bool>false</bool>
-        </property>
-       </widget>
-      </item>
-     </layout>
+       </item>
+       <item>
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="mainTab">
+      <attribute name="title">
+       <string>Main</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <widget class="ctkCollapsibleButton" name="inputsCollapsibleButton">
+         <property name="maximumSize">
+          <size>
+           <width>16777215</width>
+           <height>90</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>Autoelectrodes</string>
+         </property>
+         <property name="collapsed">
+          <bool>false</bool>
+         </property>
+         <layout class="QFormLayout" name="formLayout_2">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label">
+            <property name="toolTip">
+             <string>List where the initial and last contact of the electrodes are defined.</string>
+            </property>
+            <property name="text">
+             <string>Input electrodes:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="qMRMLNodeComboBox" name="inputSelector">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
+            <property name="toolTip">
+             <string>Pick the list to generate the electrodes.</string>
+            </property>
+            <property name="nodeTypes">
+             <stringlist>
+              <string>vtkMRMLMarkupsFiducialNode</string>
+             </stringlist>
+            </property>
+            <property name="showHidden">
+             <bool>false</bool>
+            </property>
+            <property name="showChildNodeTypes">
+             <bool>false</bool>
+            </property>
+            <property name="addEnabled">
+             <bool>false</bool>
+            </property>
+            <property name="removeEnabled">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QPushButton" name="applyButton">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
+            <property name="toolTip">
+             <string>Generate the position of all the contacts of each electrode.</string>
+            </property>
+            <property name="text">
+             <string>Generate electrodes</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="ctkCollapsibleButton" name="visualizationCollapsibleButton">
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>536</height>
+          </size>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>16777215</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="baseSize">
+          <size>
+           <width>0</width>
+           <height>1000</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>Visualization</string>
+         </property>
+         <property name="collapsed">
+          <bool>false</bool>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_2">
+          <item row="1" column="0">
+           <widget class="ctkCollapsibleGroupBox" name="CollapsibleGroupBox">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="title">
+             <string>Advanced settings</string>
+            </property>
+            <property name="collapsed">
+             <bool>false</bool>
+            </property>
+            <layout class="QFormLayout" name="formLayout_3">
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_3">
+               <property name="text">
+                <string>Template:</string>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QComboBox" name="templateName">
+               <property name="enabled">
+                <bool>true</bool>
+               </property>
+               <property name="editable">
+                <bool>false</bool>
+               </property>
+               <property name="currentText">
+                <string>EpiDB</string>
+               </property>
+               <item>
+                <property name="text">
+                 <string>EpiDB</string>
+                </property>
+               </item>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QPushButton" name="applySettingsButton">
+               <property name="text">
+                <string>Apply settings</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="qSlicerSimpleMarkupsWidget" name="visulizeMarkupsWidget">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>16777215</height>
+             </size>
+            </property>
+            <property name="baseSize">
+             <size>
+              <width>0</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="mouseTracking">
+             <bool>false</bool>
+            </property>
+            <property name="tabletTracking">
+             <bool>false</bool>
+            </property>
+            <property name="acceptDrops">
+             <bool>false</bool>
+            </property>
+            <property name="inputMethodHints">
+             <set>Qt::ImhNone</set>
+            </property>
+            <property name="enterPlaceModeOnNodeChange">
+             <bool>false</bool>
+            </property>
+            <property name="jumpToSliceEnabled">
+             <bool>true</bool>
+            </property>
+            <property name="nodeSelectorVisible">
+             <bool>false</bool>
+            </property>
+            <property name="optionsVisible">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="ctkCollapsibleButton" name="outputsCollapsibleButton">
+         <property name="text">
+          <string>Mapping</string>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+         <property name="collapsed">
+          <bool>true</bool>
+         </property>
+         <layout class="QFormLayout" name="formLayout_4">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_2">
+            <property name="text">
+             <string>Fixed volume:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="qMRMLNodeComboBox" name="fixedVolumeSelector">
+            <property name="toolTip">
+             <string>Pick the fixed volume for the registration of the anatomical templates of the electrodes. Ideally, it should be a cropped image of the T1 scan just depicting the brain.</string>
+            </property>
+            <property name="nodeTypes">
+             <stringlist>
+              <string>vtkMRMLScalarVolumeNode</string>
+             </stringlist>
+            </property>
+            <property name="showChildNodeTypes">
+             <bool>false</bool>
+            </property>
+            <property name="noneEnabled">
+             <bool>false</bool>
+            </property>
+            <property name="addEnabled">
+             <bool>false</bool>
+            </property>
+            <property name="removeEnabled">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_4">
+            <property name="text">
+             <string>Destination folder:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="ctkDirectoryButton" name="DirectoryButton"/>
+          </item>
+          <item row="2" column="1">
+           <widget class="QPushButton" name="pushButton">
+            <property name="text">
+             <string>Register</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QPushButton" name="pushButton_mapping">
+            <property name="text">
+             <string>Map electrodes</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="ctkCollapsibleButton" name="copytransferCollapsibleButton">
+         <property name="enabled">
+          <bool>true</bool>
+         </property>
+         <property name="font">
+          <font>
+           <weight>50</weight>
+           <bold>false</bold>
+           <kerning>true</kerning>
+          </font>
+         </property>
+         <property name="text">
+          <string>Copy/Transfer electrodes</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+         <property name="collapsed">
+          <bool>true</bool>
+         </property>
+         <layout class="QFormLayout" name="formLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_inputlist">
+            <property name="text">
+             <string>Input list:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="qMRMLNodeComboBox" name="inputListSelector">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="font">
+             <font>
+              <weight>50</weight>
+              <bold>false</bold>
+              <kerning>true</kerning>
+             </font>
+            </property>
+            <property name="nodeTypes">
+             <stringlist>
+              <string>vtkMRMLMarkupsFiducialNode</string>
+             </stringlist>
+            </property>
+            <property name="noneEnabled">
+             <bool>false</bool>
+            </property>
+            <property name="removeEnabled">
+             <bool>false</bool>
+            </property>
+            <property name="editEnabled">
+             <bool>false</bool>
+            </property>
+            <property name="renameEnabled">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="label_6">
+            <property name="text">
+             <string>Output list: </string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="qMRMLNodeComboBox" name="outputListSelector">
+            <property name="enabled">
+             <bool>false</bool>
+            </property>
+            <property name="toolTip">
+             <string/>
+            </property>
+            <property name="nodeTypes">
+             <stringlist>
+              <string>vtkMRMLMarkupsFiducialNode</string>
+             </stringlist>
+            </property>
+            <property name="showChildNodeTypes">
+             <bool>false</bool>
+            </property>
+            <property name="noneEnabled">
+             <bool>false</bool>
+            </property>
+            <property name="addEnabled">
+             <bool>true</bool>
+            </property>
+            <property name="removeEnabled">
+             <bool>false</bool>
+            </property>
+            <property name="editEnabled">
+             <bool>false</bool>
+            </property>
+            <property name="renameEnabled">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="1">
+           <widget class="ctkCollapsibleButton" name="transferCollapsibleButton">
+            <property name="text">
+             <string>Enable transfer</string>
+            </property>
+            <property name="collapsed">
+             <bool>false</bool>
+            </property>
+            <property name="collapsedHeight">
+             <number>0</number>
+            </property>
+            <layout class="QFormLayout" name="formLayout_5">
+             <item row="0" column="0">
+              <widget class="QCheckBox" name="checkBox_transfer">
+               <property name="text">
+                <string>Transfer</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item row="9" column="0">
+           <widget class="QLabel" name="label_7">
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+          <item row="9" column="1">
+           <widget class="QPushButton" name="copyButton">
+            <property name="text">
+             <string>Copy / Tranfer</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="ctkCollapsibleButton" name="outputsCollapsibleButton_2">
+         <property name="text">
+          <string>Generate electrodes table</string>
+         </property>
+         <property name="checked">
+          <bool>false</bool>
+         </property>
+         <property name="collapsed">
+          <bool>true</bool>
+         </property>
+         <layout class="QFormLayout" name="formLayout_6">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_5">
+            <property name="text">
+             <string>Electrodes:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="qMRMLNodeComboBox" name="electrodesSelector">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
+            <property name="nodeTypes">
+             <stringlist>
+              <string>vtkMRMLMarkupsFiducialNode</string>
+             </stringlist>
+            </property>
+            <property name="showChildNodeTypes">
+             <bool>false</bool>
+            </property>
+            <property name="hideChildNodeTypes">
+             <stringlist/>
+            </property>
+            <property name="addEnabled">
+             <bool>false</bool>
+            </property>
+            <property name="removeEnabled">
+             <bool>false</bool>
+            </property>
+            <property name="interactionNodeSingletonTag">
+             <string>Singleton</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_4_2">
+            <property name="text">
+             <string>Destination folder:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="ctkDirectoryButton" name="DirectoryButton_subject">
+            <property name="toolTip">
+             <string>Directory where all the information of the subject will be stored</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QPushButton" name="saveTableButton">
+            <property name="toolTip">
+             <string>Save all files of the subject</string>
+            </property>
+            <property name="text">
+             <string>Generate and save tables</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="exportTab">
+      <attribute name="title">
+       <string>Export</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="exportTabLayout">
+       <item>
+        <widget class="QGroupBox" name="exportGroupBox">
+         <property name="title">
+          <string>Export patient to EpiDB</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_4">
+          <item row="0" column="0">
+           <widget class="QLabel" name="label_5_2">
+            <property name="text">
+             <string>Patient ID:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="saveFileName"/>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="label_8">
+            <property name="text">
+             <string>Destination folder:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="ctkDirectoryButton" name="DirectoryButton_saveBundle">
+            <property name="toolTip">
+             <string>Directory where all the information of the subject will be stored</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QPushButton" name="saveBundleButton">
+            <property name="toolTip">
+             <string>Save all files of the subject</string>
+            </property>
+            <property name="text">
+             <string>Save</string>
+            </property>
+            <property name="checkable">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="exportVerticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
     </widget>
    </item>
   </layout>
@@ -659,11 +638,6 @@
    <class>ctkDirectoryButton</class>
    <extends>QWidget</extends>
    <header>ctkDirectoryButton.h</header>
-  </customwidget>
-  <customwidget>
-   <class>ctkPushButton</class>
-   <extends>QPushButton</extends>
-   <header>ctkPushButton.h</header>
   </customwidget>
   <customwidget>
    <class>qMRMLNodeComboBox</class>
