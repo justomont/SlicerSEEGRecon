@@ -20,6 +20,7 @@ import re
 import numpy as np
 import csv
 from itertools import compress
+from scipy.ndimage import binary_dilation
 
 import os
 from os import listdir
@@ -37,8 +38,7 @@ except:
     import pip
     pip_install("pandas")
     import pandas as pd
-    
-    
+       
 try:
     import plotly
 except: 
@@ -52,6 +52,8 @@ except:
     import pip
     pip_install("PySide2")
     from PySide2 import QtWidgets
+
+
 
 
 def has_numbers(inputString):
@@ -257,7 +259,7 @@ def findContacts(fidNode):
     fidNode_White_Matter = slicer.vtkMRMLMarkupsFiducialNode()
     fidNode_White_Matter.SetName(fidNode.GetName()+"_White_Matter")
     slicer.mrmlScene.AddNode(fidNode_White_Matter)
-    
+
     # Initialize the variables where the GREY matter nodes will be stored
     monopolar_markups_Grey_Matter = []
     monopolar_RAS_Grey_Matter = []
@@ -944,7 +946,7 @@ def regionsMNInibabel(fixedVolumeNode):
 
 def importAndLoadDICOMFolder(dicom_folder):
     # Step 1: Create and initialize DICOM database
-    dbDir = os.path.join(slicer.app.temporaryPath, "MyDICOMDb")
+    dbDir = os.path.join(dicom_folder, "MyDICOMDb")
     os.makedirs(dbDir, exist_ok=True)
     dbPath = os.path.join(dbDir, "ctkDICOM.sql")
 
@@ -964,7 +966,6 @@ def importAndLoadDICOMFolder(dicom_folder):
         for studyUID in studies:
             series = db.seriesForStudy(studyUID)
             for seriesUID in series:
-                print(f"Loading Series UID: {seriesUID}")
                 DICOMLib.loadSeriesByUID([seriesUID])
         
 #
@@ -1157,10 +1158,10 @@ NameError: name 'PlotWindow' is not defined
 
         # Visualization advanced inputs
         # self.ui.templateName.activated.connect(self.updateParameterNodeFromGUI)
-        self.templateName = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.visualizationCollapsibleButton.CollapsibleGroupBox.templateName
+        self.templateName = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.visualizationCollapsibleButton.templateName
         self.templateName.connect('activated(QString)', self.updateParameterNodeFromGUI)    
         # self.ui.applySettingsButton.connect('clicked(bool)', self.onApplyTemplateSettingsButton)
-        self.applySettingsButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.visualizationCollapsibleButton.CollapsibleGroupBox.applySettingsButton
+        self.applySettingsButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.visualizationCollapsibleButton.applySettingsButton
         self.applySettingsButton.connect('clicked(bool)', self.onApplyTemplateSettingsButton)
          
         # Buttons
@@ -1709,6 +1710,143 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         except:
             logging.error("Saving failed")
 
+    def registerCTtoT1MRI(self, t1VolumeNode, ctVolumeNode):
+
+        """        Register CT volume to T1 MRI volume.
+        :param t1VolumeNode: T1 MRI volume node
+        :param ctVolumeNode: CT volume node
+        
+        Following: Registration of brain CT images to an MRI template for the purpose of lesion-symptom mapping, Hugo J. Kuijf 
+        https://link.springer.com/chapter/10.1007/978-3-319-02126-3_12#citeas
+        """
+
+        volumesLogic = slicer.modules.volumes.logic()
+        transformLogic = slicer.modules.transforms.logic()
+
+        print("     Extracting bone from CT volume...")
+
+        # Extract the bone from the CT volume
+        ctVolume = volumesLogic.CloneVolume(slicer.mrmlScene,ctVolumeNode, 'CT_Bones')
+        volumesLogic.CenterVolume(ctVolume)
+        boneThreshold = 500 
+        ctArray = slicer.util.arrayFromVolume(ctVolume)
+        ctArray[ctArray <= boneThreshold] = 0  # Set values below threshold to 0
+        slicer.util.arrayFromVolumeModified(ctVolume)
+
+        print("     Loading template...")
+        # Extract bone from the MNI152 template
+        resPath = os.path.join(os.path.dirname(__file__), 'Resources/MNI')
+        mniPath = os.path.join(resPath, 'icbm_avg_152_t1_tal_lin.nii')
+        mniBrainMaskPath = os.path.join(resPath, 'icbm_avg_152_t1_tal_lin_mask.nii')
+        mniHeadMaskPath = os.path.join(resPath, 'icbm_avg_152_t1_tal_lin_homemadeHeadMask.nii')
+
+        mniVolume = slicer.util.loadVolume(mniPath,properties={"name":"ICBM152","center":True})
+        
+        mniBrainMaskVolume = slicer.util.loadVolume(mniBrainMaskPath, properties={"name": "ICBM152_BrainMask", "center": True})
+        mniBrainMaskArray = slicer.util.arrayFromVolume(mniBrainMaskVolume).copy()
+        mniBrainMaskArray[mniBrainMaskArray < 1] = 0 # Ensure binary mask
+        mniBrainMaskArray[mniBrainMaskArray >= 1] = 1  
+
+        mniHeadMaskVolume = slicer.util.loadVolume(mniHeadMaskPath, properties={"name": "ICBM152_HeadMask", "labelmap":True, "center": True})
+        mniHeadMaskArray = slicer.util.arrayFromVolume(mniHeadMaskVolume).copy()
+        mniHeadMaskArray[mniHeadMaskArray < 1] = 0 # Ensure binary mask
+        mniHeadMaskArray[mniHeadMaskArray >= 1] = 1
+
+        mniBonesVolume = volumesLogic.CloneVolume(slicer.mrmlScene, mniVolume, 'ICBM152_Bones')
+        mniBonesArray = slicer.util.arrayFromVolume(mniBonesVolume)
+        v_min = np.min(mniBonesArray)
+        v_max = np.max(mniBonesArray)
+        mniBonesArray = v_max - (mniBonesArray - v_min) # Invert the values to get bone density
+        mniBonesArray[mniBonesArray <= 250000] = 0  # Set values below threshold to 0 (remove soft tissue)
+        mniBonesArray[mniBrainMaskArray == 1] = 0  # Set values inside the brain mask to 0 (remove the brain)
+        mniBonesArray[mniHeadMaskArray != 1] = 0  # Set values outside the head mask to 0 (remove the tissue outside of skull and background)
+
+        slicer.util.updateVolumeFromArray(mniBonesVolume, mniBonesArray)
+
+        print("     Registering Template to CT... WAIT ...")
+        outputVolume = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLScalarVolumeNode', 'ICBM_CTregistered')
+        ICBMtoCT_Transform = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLTransformNode', 'ICBMtoCT')
+
+        slicer.util.selectModule("Elastix")
+        elastix_widget = slicer.modules.elastix.widgetRepresentation().self()
+
+        elastix_widget.ui.fixedVolumeSelector.setCurrentNode(ctVolume)
+        elastix_widget.ui.movingVolumeSelector.setCurrentNode(mniVolume)
+        elastix_widget.ui.outputVolumeSelector.setCurrentNode(outputVolume)
+        elastix_widget.ui.outputTransformSelector.setCurrentNode(ICBMtoCT_Transform)
+
+        registrationPreset = elastix_widget.logic.getRegistrationPresets()[0] # Default preset (general transform)
+        elastix_widget._parameterNode.SetParameter(elastix_widget.logic.REGISTRATION_PRESET_ID_PARAM, registrationPreset.getID())
+
+        elastix_widget.onApplyButton()
+
+        # Invert the transform to apply it to the CT volume later
+        CTtoICBM_Transform = slicer.mrmlScene.CopyNode(ICBMtoCT_Transform)
+        CTtoICBM_Transform.Inverse()
+
+        print("     Registering Template to T1 MRI... WAIT ...")
+        mniVolume = slicer.util.getNode("ICBM152")
+        outputVolume = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLScalarVolumeNode', 'ICBM_MRIregistered')
+        ICBMtoMRI_Transform = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLTransformNode', 'ICBMtoMRI')
+        
+        elastix_widget.ui.fixedVolumeSelector.setCurrentNode(t1VolumeNode)
+        elastix_widget.ui.movingVolumeSelector.setCurrentNode(mniVolume)
+        elastix_widget.ui.outputVolumeSelector.setCurrentNode(outputVolume)
+        elastix_widget.ui.outputTransformSelector.setCurrentNode(ICBMtoMRI_Transform)
+
+        registrationPreset = elastix_widget.logic.getRegistrationPresets()[0] # Default preset (general transform)
+        elastix_widget._parameterNode.SetParameter(elastix_widget.logic.REGISTRATION_PRESET_ID_PARAM, registrationPreset.getID())
+
+        elastix_widget.onApplyButton()
+
+        print("     Applying non-linear transforms to CT volume...")
+        # Apply the transforms to the CT volume
+        ctVolumeNode = slicer.util.getFirstNodeByName("CT_postElectrodes_RAW")
+        ctRegisteredVolumeNode = slicer.mrmlScene.CopyNode(ctVolumeNode)
+        ctRegisteredVolumeNode.SetName("CT_Registered_ICBM")
+        ctRegisteredVolumeNode.SetAndObserveTransformNodeID(CTtoICBM_Transform.GetID())
+        slicer.vtkSlicerTransformLogic().hardenTransform(ctRegisteredVolumeNode)
+
+        ctRegisteredVolumeNode = slicer.util.getFirstNodeByName("CT_Registered_ICBM")
+        ctRegisteredVolumeNode = slicer.mrmlScene.CopyNode(ctRegisteredVolumeNode)
+        ctRegisteredVolumeNode.SetName("CT_Registered_ICBM_GOAL")
+        ctRegisteredVolumeNode.SetAndObserveTransformNodeID(ICBMtoMRI_Transform.GetID())
+        slicer.vtkSlicerTransformLogic().hardenTransform(ctRegisteredVolumeNode)
+
+        print("     Registering Goal to CT... WAIT ...")
+        # Register the goal to the CT volume
+        ctGoalVolumeNode = slicer.util.getFirstNodeByName("CT_Registered_ICBM_GOAL")
+        ctRawVolumeNode = slicer.util.getFirstNodeByName("CT_postElectrodes_RAW")
+        outputVolume = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLScalarVolumeNode', 'CT_postElectrodes')
+        CTGoaltoCT_Transform = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLTransformNode', 'CTGoaltoCT')
+
+        elastix_widget.ui.fixedVolumeSelector.setCurrentNode(ctRawVolumeNode)
+        elastix_widget.ui.movingVolumeSelector.setCurrentNode(ctGoalVolumeNode)
+        elastix_widget.ui.outputVolumeSelector.setCurrentNode(outputVolume)
+        elastix_widget.ui.outputTransformSelector.setCurrentNode(CTGoaltoCT_Transform)
+
+        registrationPreset = elastix_widget.logic.getRegistrationPresets()[1] # RIGID TRANSFORM
+        elastix_widget._parameterNode.SetParameter(elastix_widget.logic.REGISTRATION_PRESET_ID_PARAM, registrationPreset.getID())
+
+        elastix_widget.onApplyButton()
+
+        # Invert the transform to apply it to the CT 
+        CTtoGoal_Transform = slicer.mrmlScene.CopyNode(CTGoaltoCT_Transform)
+        CTtoGoal_Transform.Inverse()
+
+        print("     Applying transform to CT volume...")
+        # Apply the transform to the CT volume
+        ctRawVolumeNode = slicer.util.getFirstNodeByName("CT_postElectrodes_RAW")
+        ctFinalVolumeNode = slicer.mrmlScene.CopyNode(ctRawVolumeNode)
+        ctFinalVolumeNode.SetName("CT_postElectrodes_Final")
+        ctFinalVolumeNode.SetAndObserveTransformNodeID(CTtoGoal_Transform.GetID())
+        slicer.vtkSlicerTransformLogic().hardenTransform(ctFinalVolumeNode)
+
+        slicer.util.selectModule("Autoelectrodes")
+
+        print("     Done!")
+
+
     def import_patient(self, rawDirectory):
 
         """
@@ -1716,12 +1854,27 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         :param rawDirectory: Directory containing the raw patient data
         """
 
-        # Folders where the data is expected
-        dicom_folder = os.path.join(rawDirectory, 'ctp')
-        freesurfer_folder = os.path.join(rawDirectory, 'fsfolder')
-        fsmri_folder = os.path.join(freesurfer_folder, 'mri')
-        fsurf_folder = os.path.join(freesurfer_folder, 'surf')
+        # Count time it takes to import the patient data
+        startTime = time.time()
 
+        # Search for specific files in all subfolders of rawDirectory
+        file_names_to_search = [
+            "aseg.mgz", "norm.mgz", "T1.mgz",
+            "rh.pial", "rh.white", "lh.pial", "lh.white"]
+        found_files = {}
+
+        dicom_folder = None
+        for root, dirs, files in os.walk(rawDirectory):
+            # Check for DICOM folder (contains .dcm files)
+            if any(f.lower().endswith('.dcm') for f in files):
+                dicom_folder = root  # Save the folder path containing DICOM files
+
+            for file_name in file_names_to_search:
+                if file_name in files and file_name not in found_files:
+                    found_files[file_name] = os.path.join(root, file_name)# Search for aseg.mgz in all subfolders of rawDirectory
+        
+        print('Loading DICOM data... \n')
+        
         # Load DICOM data
         importAndLoadDICOMFolder(dicom_folder)
 
@@ -1729,59 +1882,89 @@ class AutoelectrodesLogic(ScriptedLoadableModuleLogic):
         # This should be always the first volume loaded, so it is safe to do this
         dicomVolumeNode = slicer.util.getNodesByClass("vtkMRMLScalarVolumeNode")[0]
         if dicomVolumeNode:
-            dicomVolumeNode.SetName("CT_postElectrodes")
+            dicomVolumeNode.SetName("CT_postElectrodes_RAW")
 
-        # Load models
-        directories = [fsmri_folder, fsurf_folder]
-        for directory in directories:
+            volumesLogic = slicer.modules.volumes.logic()
+            volumesLogic.CenterVolume(dicomVolumeNode)
 
-            for filename in os.listdir(directory):
+        for filename in found_files:
 
-                print(f"Processing file: {filename}")
+            print(f"Processing file: {filename}")
 
-                file_path = os.path.join(directory, filename)
+            file_path = found_files[filename]
 
-                # Load the segmentation file
-                if filename.endswith('.mgz') and 'aseg' in filename.lower():
-                    
-                    # Load aseg as labelmap volume
-                    labelmapNode = slicer.util.loadVolume(file_path, {'labelmap': True})
-                    labelmapNode.SetName("aseg")
+            # Load the segmentation file
+            if filename.endswith('.mgz') and 'aseg' in filename.lower():
+                print(f"Loading segmentation: {filename} ...\n")
+                
+                # Load aseg as labelmap volume
+                labelmapNode = slicer.util.loadVolume(file_path, {'labelmap': True})
+                labelmapNode.SetName("aseg")
 
-                    # Set color table to FreeSurfer labels
-                    fsColorNode = slicer.util.getNode('FreeSurferLabels')
-                    labelmapNode.GetDisplayNode().SetAndObserveColorNodeID(fsColorNode.GetID())
+                # Set color table to FreeSurfer labels
+                fsColorNode = slicer.util.getNode('FreeSurferLabels')
+                labelmapNode.GetDisplayNode().SetAndObserveColorNodeID(fsColorNode.GetID())
 
-                    # # Create a segmentation node and import labelmap
-                    # segmentationNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode", "aseg_segmentation")
-                    # slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(labelmapNode, segmentationNode)
+                # # Optional: show the segmentation
+                # segmentationNode.CreateDefaultDisplayNodes()
+                # segmentationNode.GetDisplayNode().SetVisibility2DFill(True)
 
-                    # # Optional: show the segmentation
-                    # segmentationNode.CreateDefaultDisplayNodes()
-                    # segmentationNode.GetDisplayNode().SetVisibility2DFill(True)
+            if filename.endswith('.mgz') and ('norm' in filename.lower() or 'T1' in filename):
+                print(f"Loading volume: {filename} ...\n")
+                volumeNode = slicer.util.loadVolume(file_path)
+                if 'norm' in filename.lower():
+                    volumeNode.SetName("brain")
+                elif 'T1' in filename:
+                    volumeNode.SetName('MRI_T1')  # Use filename without extension as node name
+                    volumeNode.GetDisplayNode().SetVisibility(True)
+            
+            # Load cortical surfaces
+            if filename.endswith('.pial') or filename.endswith('.white'):
+                print(f"Loading surface: {filename} ...\n")
+                parts = filename.split('.')
+                hemi, surfaceType = parts  
+                baseName = f"{hemi}_{surfaceType}"
 
-                if filename.endswith('.mgz') and ('norm' in filename.lower() or 'T1' in filename):
-                    print(f"Loading volume: {filename}")
-                    volumeNode = slicer.util.loadVolume(file_path)
-                    if 'norm' in filename.lower():
-                        volumeNode.SetName("brain")
-                    elif 'T1' in filename:
-                        volumeNode.SetName('MRI_T1')  # Use filename without extension as node name
+                # Read file content
+                logic = NiBabelModelIOLogic()   
+                loadedNode = logic.createAndReadModelNode(file_path, baseName)
 
-                # Load cortical surfaces
-                if filename.endswith('.pial') or filename.endswith('.white'):
-                    parts = filename.split('.')
-                    hemi, surfaceType = parts  
-                    baseName = f"{hemi}_{surfaceType}"
+        print("All files processed successfully!\n")
 
-                    # Read file content
-                    logic = NiBabelModelIOLogic()   
-                    loadedNode = logic.createAndReadModelNode(file_path, baseName)
+        print("Now registering the CT volume to the T1 MRI volume...\n")
 
-                    loadedNode.CreateDefaultDisplayNodes()
-                        
-                #         print(f"Loading model: {modelName} from {file_path}")
+        # # Now co-register the T1 volume (fixed) with the CT volume (moving)
+        t1VolumeNode = slicer.util.getNode("MRI_T1")
+        ctVolumeNode = slicer.util.getNode("CT_postElectrodes_RAW")
 
+        self.registerCTtoT1MRI(t1VolumeNode, ctVolumeNode)
+
+        print("Files imported successfully!\n")
+
+        # Count time it took to import the patient data
+        stopTime = time.time()
+        elapsed_minutes = int((stopTime - startTime) // 60)
+        elapsed_seconds = int((stopTime - startTime) % 60)
+        print(f'Importing patient data completed in {elapsed_minutes} min {elapsed_seconds} sec')
+
+
+        # if t1VolumeNode and ctVolumeNode:
+        #     linearTransformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
+        #     linearTransformNode.SetName("TransformCTtoT1")
+        #     outputVolumeNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
+        #     outputVolumeNode.SetName("CT_postElectrodes") 
+
+        #     parameters = {"fixedVolume": t1VolumeNode,
+        #                   "movingVolume": ctVolumeNode,
+        #                   "samplingPercentage": 0.02,
+        #                   "linearTransform": linearTransformNode,
+        #                   "outputVolume": outputVolumeNode,
+        #                   "initializeTransformMode": "useCenterOfHeadAlign",
+        #                   "useRigid": True}
+            
+        #     # Execution
+        #     generalRegistration = slicer.modules.brainsfit
+        #     cliNode = slicer.cli.run(generalRegistration, None, parameters)
 
 
 
