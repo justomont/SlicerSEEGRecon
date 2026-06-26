@@ -1,14 +1,151 @@
-# SlicerAutoelectrodes
- 
-Welcome to SlicerAutoelectrodes, a powerful 3D Slicer module designed to streamline the semi-automatic placement of stereo electroencephalography (SEEG) electrodes using Annotation Markups. Whether you're a researcher, clinician, or enthusiast in the neuroimaging field, this tool aims to enhance your workflow, saving you time and improving accuracy in electrode placement.
+# SlicerSEEGRecon
+<img src="https://github.com/justomont/SlicerAutoelectrodes/blob/main/Autoelectrodes/Resources/Icons/Autoelectrodes.png" align="right"
+     alt="SlicerSEEGRecon Logo" width="160" height="178">
+     
+SEEG Reconstruction & Analysis Toolkit (a 3D Slicer Extension)
 
-By leveraging the capabilities of 3D Slicer, SlicerAutoelectrodes allows you to effortlessly position SEEG electrodes with precision. Simply annotate your points, and let the extension handle the rest, providing you with reliable and reproducible electrode placements. Dive into our comprehensive tutorial to get started and unlock the full potential of your neuroimaging analysis.
+A practical, end-to-end tool to help you reconstruct and analyse SEEG implantations after surgery, directly inside [3D Slicer](https://www.slicer.org/).
+
+This module is designed for clinicians and researchers working with intracranial EEG, reducing the manual steps needed to go from post-op scans → clean electrode localisation → publication-ready figures → exportable datasets.
+
+<p align="center">
+  <img src="https://github.com/justomont/SlicerAutoelectrodes/blob/main/Autoelectrodes/Resources/Icons/marca_vermella.png"
+       alt="UPF logo"
+       width="180">
+  &nbsp;&nbsp;&nbsp;
+  <img src="https://github.com/justomont/SlicerAutoelectrodes/blob/main/Autoelectrodes/Resources/Icons/IMIM-logo.png"
+       alt="IMIM logo"
+       width="210">
+</p>
+
+## Table of Contents
+- [What this tool helps you do](#-what-this-tool-helps-you-do)
+- [Smart data import](#-smart-data-import-freesurfer-ready)
+- [CT → MRI registration](#-ct--mri-registration-fully-automatic)
+- [SEEG electrode reconstruction](#-semi-automatic-electrode-reconstruction)
+- [MNI & anatomy mapping](#-mni--anatomy-mapping)
+- [Visualization templates](#-figure-friendly-visualisation-templates)
+- [Contact management](#-contact-management)
+- [SEEG statistics](#-automatic-seeg-statistics)
+- [Export projects](#-export-everything)
+- [Requirements](#system-requirements)
+- [Installation](#installation)
+- [Open Source](#-open-source)
+- [Authors](#authors)
+
+## 🚀 What this tool helps you do
+
+Instead of juggling multiple tools and manual steps, this extension lets you:
+
+* 📥 Load MRI, CT, and FreeSurfer outputs automatically
+* 🔗 Register CT to MRI in one click
+* 🎯 Reconstruct SEEG electrodes semi-automatically
+* 🧭 Map contacts to brain anatomy and MNI space
+* 📊 Generate clinical reporting statistics instantly
+* 🎨 Create publication-ready visualisation templates
+* 📦 Export everything as a single portable project (.epiDB)
+
+## Features
+### 📥 Smart data import (FreeSurfer-ready)
+
+Drop your patient folder in, and the module will try to figure things out for you.
+
+It supports:
+
+* FreeSurfer outputs (aseg.mgz, T1.mgz, surfaces, etc.)
+* CT DICOM folders
+* Standard MRI datasets
+* Existing .epiDB projects
+
+👉 Missing files? No problem. Everything available gets loaded automatically.
+
+### 🔗 CT → MRI registration (fully automatic)
+
+Align post-op CT with MRI in a single click.
+
+* Built specifically for SEEG datasets
+* Fast, robust, and automatic
+* Saves a huge amount of manual work
+
+⚠️ Still: always visually check the result (clinical sanity check recommended).
+
+### 🎯 Semi-automatic electrode reconstruction
+
+No more manual point-by-point reconstruction.
+
+Just select:
+
+* deepest contact (tip)
+* superficial contact
+* optional bend point
+* electrode name
+
+And the tool reconstructs the full trajectory for you.
+
+It also:
+
+* Computes monopolar contacts
+* Generates bipolar derivations (A1–A2, etc.)
+* Labels contacts using available brain segmentation (f.e. grey/white matter)
+
+### 🧠 MNI & anatomy mapping
+
+Automatically place your electrodes in standard space.
+
+You get:
+
+* MNI coordinates for all contacts
+* Anatomical labels (atlas-based if available)
+* Custom label map support
+* A clean exportable table with everything organised
+
+### 🎨 Figure-friendly visualisation templates
+
+Because making figures shouldn’t take hours.
+
+* Save your preferred visual style once
+* Apply it to any patient in one click
+* Includes a prebuilt template used in the IMIM-UPF Epilepsy Group
+
+### 📍 Contact management
+
+Small but very useful:
+
+* Copy/paste contacts between lists
+* Create subsets of clinically relevant electrodes
+* Quickly reorganise your dataset without frustration
+
+### 📊 Automatic SEEG statistics
+
+Generate key descriptive metrics instantly:
+
+* Total number of contacts
+* Grey vs white matter distribution
+* Left vs right hemisphere coverage
+* Brain and hemisphere volumes (cm³)
+* Contact density per region
+
+👉 Ideal for methods sections and cohort description tables.
+
+### 📦 Export everything
+
+Save your entire reconstruction as a single project file.
+
+The .epiDB format includes:
+
+* Imaging data
+* Electrode geometry
+* Contact annotations
+* Transformations
+* Visualization settings
+* Metadata
+
+Think of it as a cleaner, more practical alternative to .mrb-style scenes.
 
 ## System Requirements
 
-- Operating System: Windows 11, MacOS BigSur v11.6 (Linux is untested but expected to work)
-- Software: 3D Slicer v5.0.3 or newer
-- Dependencies: FreeSurfer Extension installed, with brain segmentation assigned the 'FreeSurferLabels' Lookup Table. To do this, select the segmentation volume in the "Volumes" module and navigate to "Display".
+* Operating System: Windows 11, MacOS BigSur v11.6 to Tahoe v26.5.1 (Linux is untested but expected to work)
+* [3D Slicer](https://www.slicer.org/) (recommended v5.8.1)
 
 ## Installation
 
@@ -19,24 +156,25 @@ By leveraging the capabilities of 3D Slicer, SlicerAutoelectrodes allows you to 
 5. Go to Modules (upper bar) and click on the magnifier icon.
 6. Select Extension Wizard > Extension Tools > Select Extension.
 7. Select and open the unzipped folder **SlicerAutoelectrodes**.
-8. A window will appear
-9. Ensure that both boxes are selected, then click on **Yes**.
-10. Installation complete!
-11. To open the extension, go to the Modules Menu > SEEG > Autoelectrodes.
-12. Enjoy! 
+8. A window will appear, ensure that both boxes are selected, then click on **Yes**.
+9. Installation complete!
+10. To open the extension, go to the Modules Menu > SEEG > Autoelectrodes.
+11. Have fun! 
 
+## 🤝 Open Source
 
-## Tutorial
+This project is fully open source and built to grow. Contributions are more than welcome!
 
-1. Start 3D Slicer.
-2. Load a volume. 
-3. Navigate to Markups > Create Markups > Point List.
-4. For each electrode, place a point on the first (deepest) contact and the last contact. Important: Both points should start with the same name, indicating the electrode's name. The first point’s name must end in 1, and the last point’s name must end in the total number of contacts that electrode has. For example, for an electrode with 10 contacts placed in the hippocampus, you could name the first point _Hip1_ and the last point _Hip10_.
-    1. If an electrode is bent, add more points at each bending position, specifying the contact number at the bend. For example, if the electrode is bent at the 6th contact, add points Hip1 (first contact), Hip6 (bending contact), and Hip10 (last contact).
-5. Once all points for all electrodes are placed, go to Modules Menu > SEEG > Autoelectrodes.
-6. Select the markup list that contains the contacts.
-7. Click on Apply, and the position of all contacts will appear.
+## Authors
 
-## Contributions and Support
+- [@justomont](https://www.github.com/justomont): Justo Montoya-Gálvez (Department of Engineering, Universitat Pompeu Fabra (UPF), 08003 Barcelona, Spain)
+- [@joricomico](https://www.github.com/joricomico): Alessandro Principe (Epilepsy Group, Hospital del Mar Research Institute (IMIM), 08003 Barcelona, Spain)
 
-We welcome any recommendations, bug reports, or requests. Please feel free to reach out to me directly on X (formerly Twitter) at [@Justo_Montoya_](https://x.com/Justo_Montoya_). Your feedback and contributions are invaluable in making this repository a robust resource for the neuroscience community.
+----
+### Clinical Use Disclaimer
+
+This software is intended for research and educational purposes. Although the algorithms have been validated on an internal dataset, users are responsible for verifying all results before clinical use. The authors assume no responsibility for clinical decisions based on the output of this software.
+
+----
+
+[Back to top](#top)
