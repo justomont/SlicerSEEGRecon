@@ -1,6 +1,6 @@
 # SlicerSEEGRecon
 [![BSD-3-Clause License](https://img.shields.io/github/license/justomont/SlicerSEEGRecon)](https://opensource.org/license/bsd-3-clause)
-<img src="https://github.com/justomont/SlicerAutoelectrodes/blob/main/Autoelectrodes/Resources/Icons/Autoelectrodes.png" align="right"
+<img src="https://github.com/justomont/SlicerSEEGRecon/blob/main/SlicerSEEGRecon/Resources/Icons/SlicerSEEGRecon.png" align="right"
      alt="SlicerSEEGRecon Logo" width="160" height="178">
      
 SEEG Reconstruction & Analysis Toolkit (a 3D Slicer Extension)
@@ -10,11 +10,11 @@ A practical, end-to-end tool to help you reconstruct and analyse SEEG implantati
 This module is designed for clinicians and researchers working with intracranial EEG, reducing the manual steps needed to go from post-op scans → clean electrode localisation → publication-ready figures → exportable datasets.
 
 <p align="center">
-  <img src="https://github.com/justomont/SlicerAutoelectrodes/blob/main/Autoelectrodes/Resources/Icons/marca_vermella.png"
+  <img src="https://github.com/justomont/SlicerSEEGRecon/blob/main/SlicerSEEGRecon/Resources/Icons/marca_vermella.png"
        alt="UPF logo"
        width="180">
   &nbsp;&nbsp;&nbsp;
-  <img src="https://github.com/justomont/SlicerAutoelectrodes/blob/main/Autoelectrodes/Resources/Icons/IMIM-logo.png"
+  <img src="https://github.com/justomont/SlicerSEEGRecon/blob/main/SlicerSEEGRecon/Resources/Icons/IMIM-logo.png"
        alt="IMIM logo"
        width="210">
 </p>
