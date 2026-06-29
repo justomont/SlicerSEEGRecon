@@ -1,15 +1,12 @@
-
-
 from scipy import signal
-
 import json
 
 import logging
 import os
-
+import zipfile
 import vtk
 import ctk, DICOMLib
-
+import tempfile
 import slicer
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin, pip_install
@@ -21,7 +18,7 @@ import numpy as np
 import csv
 from itertools import compress
 from scipy.ndimage import binary_dilation
-
+import shutil
 import os
 from os import listdir
 from os.path import isfile,join
@@ -31,6 +28,7 @@ import time
 import warnings
 
 import qt
+from qt import QProgressDialog
 
 try:
     import pandas as pd
@@ -45,15 +43,6 @@ except:
     import pip
     pip_install("plotly")
     import plotly
-
-try: 
-    from PySide2 import QtWidgets
-except:
-    import pip
-    pip_install("PySide2")
-    from PySide2 import QtWidgets
-
-
 
 
 def has_numbers(inputString):
@@ -157,6 +146,187 @@ def anatomicREL(tag):
     anatomic = region[indx.index(tag)]
     return anatomic
 
+def anatomicREL_Brodmann(tag):
+
+    region = ['unknown',
+            '1 UNKNOWN',
+            'BA 20',
+            'BA 38',
+            'BA 21',
+            'BA 36',
+            'BA 11',
+            'BA 37',
+            'BA 25',
+            'BA 12',
+            'BA 19',
+            'BA 47',
+            'BA 22',
+            'BA 18',
+            'BA 10',
+            'BA 17',
+            'BA 32',
+            'BA 24',
+            'BA 46',
+            'BA 45',
+            'BA 33',
+            'BA 44',
+            'BA 6',
+            'BA 23',
+            'BA 42',
+            'BA 41',
+            'BA 30',
+            'BA 43',
+            'BA 29',
+            'BA 26',
+            'BA 31',
+            'BA 4',
+            'BA 1',
+            'BA 9',
+            'BA 39',
+            'BA 2',
+            'BA 3',
+            'BA 40',
+            'BA 7',
+            'BA 8',
+            'BA 5',
+            '41 UNKNOWN',
+            '42 UNKNOWN',
+            '43 UNKNOWN',
+            '101 UNKNOWN',
+            'BA 20',
+            'BA 38',
+            'BA 21',
+            'BA 36',
+            'BA 11',
+            'BA 37',
+            'BA 25',
+            'BA 12',
+            'BA 19',
+            'BA 47',
+            'BA 22',
+            'BA 18',
+            'BA 10',
+            'BA 17',
+            'BA 32',
+            'BA 24',
+            'BA 46',
+            'BA 45',
+            'BA 33',
+            'BA 44',
+            'BA 6',
+            'BA 23',
+            'BA 42',
+            'BA 41',
+            'BA 30',
+            'BA 43',
+            'BA 29',
+            'BA 26',
+            'BA 31',
+            'BA 4',
+            'BA 1',
+            'BA 9',
+            'BA 39',
+            'BA 2',
+            'BA 3',
+            'BA 40',
+            'BA 7',
+            'BA 8',
+            'BA 5',
+            '141 UNKNOWN',
+            '142 UNKNOWN',
+            '143 UNKNOWN']
+    indx = [0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120,
+            121,
+            122,
+            123,
+            124,
+            125,
+            126,
+            127,
+            128,
+            129,
+            130,
+            131,
+            132,
+            133,
+            134,
+            135,
+            136,
+            137,
+            138,
+            139,
+            140,
+            141,
+            142,
+            143]
+    
+    anatomic = region[indx.index(tag)]
+    return anatomic
+
+
 def RAStoIJK(ras,volumeNode):
     transformRasToVolumeRas = vtk.vtkGeneralTransform()
     slicer.vtkMRMLTransformNode.GetTransformBetweenNodes(None, volumeNode.GetParentTransformNode(), transformRasToVolumeRas)
@@ -192,14 +362,14 @@ def natural_keys(text):
     """
     return [int(s) if s.isdigit() else s.lower() for s in re.split(r'(\d+)', text)]
 
-def findContacts(fidNode):
-    
+def findContacts(fidNode, labelmapNode):
+
     # Get the aseg map
     global asegVolumeNode, asegVoxelArray
     # In the new versions of the module the aseg volume is called brain_segmentation but aseg in the old ones
-    asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('brain_segmentation')
+    asegVolumeNode = labelmapNode
     if not asegVolumeNode: 
-        asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
+        asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('brain_segmentation')
     asegVoxelArray = slicer.util.arrayFromVolume(asegVolumeNode)
     
     # All markup's names and positions in RAS coordinates
@@ -804,26 +974,34 @@ def findContacts(fidNode):
     slicer.mrmlScene.RemoveNode(fidNode)
         
 def registerMNI(fixedVolumeNode):
+# This function does the registration of the MNI template to the space of the patient 
+
     global mniPath, linearTransformNode
     
     # ICBM152  
     # Paths
     mniPath = os.path.join(os.path.dirname(__file__), 'Resources/MNI')
+
+    # MNI 152 linear symmetric
     templatePath = os.path.join(mniPath, 'icbm_avg_152_t1_tal_lin.nii') # moving volume
     movingmaskPath = os.path.join(mniPath, 'icbm_avg_152_t1_tal_lin_mask.nii') # moving volume mask
+
+    # MNI 152 nonlinear asymmetric 2009c
+    # templatePath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_asym_09c.nii') # moving volume
+    # movingmaskPath = os.path.join(mniPath, 'mni_icbm152_t1_tal_nlin_sym_09a_mask.nii') # moving volume mask
     
     # Set parameters
-    movingVolumeNode = slicer.util.loadVolume(templatePath,properties={"name":"ICBM152_T1","center":False})
+    movingVolumeNode = slicer.util.loadVolume(templatePath,properties={"name":"ICBM152_T1","center":True})
     
     linearTransformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
     linearTransformNode.SetName("Transform2MNI")
     outputVolumeNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
     outputVolumeNode.SetName("ICBM152_registered")
     
-    aseg = slicer.util.getFirstNodeByName("aseg")
+    aseg = slicer.util.getFirstNodeByName("brain_segmentation")
     fixedmaskNode = slicer.mrmlScene.CopyNode(aseg)
     fixedmaskNode.SetName("aseg_mask")
-    movingmaskNode = slicer.util.loadVolume(movingmaskPath,properties={"name":"MNI_mask","labelmap":True,"center":False})
+    movingmaskNode = slicer.util.loadVolume(movingmaskPath,properties={"name":"MNI_mask","labelmap":True,"center":True})
     
     parameters = {}
     parameters["fixedVolume"] = fixedVolumeNode
@@ -832,9 +1010,6 @@ def registerMNI(fixedVolumeNode):
     parameters["linearTransform"] = linearTransformNode
     parameters["outputVolume"] = outputVolumeNode
     parameters["initializeTransformMode"] = "useCenterOfHeadAlign"
-    # parameters["useRigid"] = True
-    # parameters["useScaleVersor3D"] = True
-    # parameters["useScaleSkewVersor3D"] = True
     parameters["useAffine"] = True
     parameters["maskProcessingMode"] = "ROI"
     parameters["fixedBinaryVolume"] = fixedmaskNode
@@ -849,96 +1024,127 @@ def registerMNI(fixedVolumeNode):
     logging.info("MNI registration complete.\n")   
             
 def regionsMNI(destinyDirectory):
-    
-    # path of the label mapfile
+    mniPath = os.path.join(os.path.dirname(__file__), 'Resources/MNI')
+    # path of the labelmap file of MNI regions
     labelmapPath = os.path.join(mniPath, 'mni_icbm152_CerebrA_tal_nlin_sym_09c.nii') # labelmap
-    
+    # path of the labelmap file of the Brodmann Areas
+    brodmannPath = os.path.join(mniPath, 'Brodmann_Mai_Matajnik.nii') # labelmap
+
     # Select the transform from the MNI to patient registration 
     transform = slicer.util.getFirstNodeByName("Transform2MNI")
     
     # Transform the labelmap to match the patient volume
-    labelmapVolumeNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_labels","labelmap":True,"center":False})
+    labelmapVolumeNode = slicer.util.loadVolume(labelmapPath,properties={"name":"MNI_labels","labelmap":True,"center":True})
     labelmapVolumeNode.SetName("transformed_MNI_labels")
     # labelmapVolumeNode.ApplyTransformMatrix(transform.GetMatrixTransformToParent())
     labelmapVolumeNode.SetAndObserveTransformNodeID(transform.GetID())
     time.sleep(15)
     slicer.util.forceRenderAllViews()
     time.sleep(5)
+
+    # Transform the Brodmann Areas labelmap to match the patient volume
+    brodmannVolumeNode = slicer.util.loadVolume(brodmannPath,properties={"name":"Brodmann_labels","labelmap":True,"center":True})
+    brodmannVolumeNode.SetName("transformed_Brodmann_Areas")
+    brodmannVolumeNode.SetAndObserveTransformNodeID(transform.GetID())
+    time.sleep(15)
+    slicer.util.forceRenderAllViews()
+    time.sleep(5)
+
     
-def regionsMNI_2(destinyDirectory):  
-    
+def regionsMNI_2(destinyDirectory, markups_to_map, templateVolumeNode):  
+    mniPath = os.path.join(os.path.dirname(__file__), 'Resources/MNI')
     # Select the transform from the MNI to patient registration 
     transform = slicer.util.getFirstNodeByName("Transform2MNI")
-    
     labelmapVolumeNode = slicer.util.getFirstNodeByName("transformed_MNI_labels")
-    
+    brodmannVolumeNode = slicer.util.getFirstNodeByName("transformed_Brodmann_Areas")
+
     # Obtain voxel array of the label map to obtain the number associated to a specific location
     MNIVoxelArray = slicer.util.arrayFromVolume(labelmapVolumeNode)
+    BrodmannVoxelArray = slicer.util.arrayFromVolume(brodmannVolumeNode)
     
     # Load MNI table relating number tag to area
     MNI_details = pd.read_csv(os.path.join(mniPath, 'CerebrA_LabelDetails.csv'))
     
-    # Atlases
-    # Initialize dataframe for the atlases
-    atlas = pd.DataFrame(columns=['Contact', 'Aseg', 'MNI'])
-    
     # Inverse transform to compute the MNI coordinates of each contact
     worldToMniTransform = vtk.vtkGeneralTransform()
     transform.GetTransformFromWorld(worldToMniTransform)
-    
+
+    if templateVolumeNode:
+        templateVoxelArray = slicer.util.arrayFromVolume(templateVolumeNode)
+
+    # Get the number of control points (number of contacts)
+    n_contacts = markups_to_map.GetNumberOfControlPoints()
+
+    # Initialize dataframe for the atlases
+    if templateVolumeNode:
+        atlas = pd.DataFrame(columns=['Contact', 'ASEG/Custom','Brodmann','MNI','X_mni', 'Y_mni', 'Z_mni'])
+    else:
+        atlas = pd.DataFrame(columns=['Contact','Brodmann','MNI','X_mni', 'Y_mni', 'Z_mni'])
+
     # Fill dataframe
-    for index,contact in enumerate(monopolar_markups):
-        
-        #  transform ras to mni
-        ras = monopolar_RAS[index]
+    for i in range(n_contacts):
+
+        contact_label = markups_to_map.GetNthControlPointLabel(i)
+        ras = NthFiducialPosition(markups_to_map,i)
+        # print(contact_label, ras)
+
         mni = [0,0,0]
         worldToMniTransform.TransformPoint(ras, mni)
         
         # Obtain Aseg Labels
-        point_ijk = RAStoIJK(ras,asegVolumeNode)
-        aseg_label = anatomicREL(asegVoxelArray[point_ijk[2],point_ijk[1],point_ijk[0]])
-        
+        if templateVolumeNode:
+            point_ijk = RAStoIJK(ras,templateVolumeNode)
+            aseg_label = anatomicREL(templateVoxelArray[point_ijk[2],point_ijk[1],point_ijk[0]])
+
         # Obtain MNI Labels
         point_ijk = RAStoIJK(ras,labelmapVolumeNode)
-        mni_label_number = MNIVoxelArray[point_ijk[2],point_ijk[1],point_ijk[0]]
+        try:
+            mni_label_number = MNIVoxelArray[point_ijk[2],point_ijk[1],point_ijk[0]]
+        except:
+            mni_label_number = 0
         
-        # In case that the label is non-existent. check surroundings
-        surround_index = 1
-        while mni_label_number == 0 and surround_index<5:
-            surroundings = [-surround_index,0,surround_index]
-            areas = []
-            for x in surroundings:
-                for y in surroundings:
-                    for z in surroundings:
-                        try:
-                            areas.append(MNIVoxelArray[point_ijk[2]+x,point_ijk[1]+y,point_ijk[0]+z])
-                        except:
-                            pass
-            mni_label_number = max(set(areas), key = areas.count)
-            surround_index = surround_index+1
+        # # In case that the label is non-existent. check surroundings
+        # surround_index = 1
+        # while mni_label_number == 0 and surround_index<5:
+        #     surroundings = [-surround_index,0,surround_index]
+        #     areas = []
+        #     for x in surroundings:
+        #         for y in surroundings:
+        #             for z in surroundings:
+        #                 try:
+        #                     areas.append(MNIVoxelArray[point_ijk[2]+x,point_ijk[1]+y,point_ijk[0]+z])
+        #                 except:
+        #                     pass
+        #     mni_label_number = max(set(areas), key = areas.count)
+        #     surround_index = surround_index+1
         
         if mni_label_number != 0:
             mni_label = MNI_details[MNI_details.eq(mni_label_number).any(axis="columns")]["Label Name"].iloc[0]
         else:
             mni_label = "unknown"
-        
-        # print(contact)
-        # print(ras)
-        # print(mni)
-        # print(point_ijk)
-        # print(mni_label_number)
-        # print(mni_label)
-        
+
+        # Obtain Brodmann Area
+        point_ijk = RAStoIJK(ras,brodmannVolumeNode)
+        try:
+            brodmann_area = anatomicREL_Brodmann(BrodmannVoxelArray[point_ijk[2],point_ijk[1],point_ijk[0]])
+        except:
+            brodmann_area = 'unknown'
         
         # Fill dataframe
-        df = pd.DataFrame([[contact, aseg_label, mni_label, mni[0], mni[1], mni[2]]], columns=['Contact', 'Aseg', 'MNI', 'X_mni', 'Y_mni', 'Z_mni'])
+        if templateVolumeNode:
+            df = pd.DataFrame([[contact_label, aseg_label, brodmann_area, mni_label, mni[0], mni[1], mni[2]]], columns=['Contact', 'ASEG/Custom', 'Brodmann','MNI', 'X_mni', 'Y_mni', 'Z_mni'])
+        else:
+            df = pd.DataFrame([[contact_label, brodmann_area, mni_label, round(mni[0]), round(mni[1]), round(mni[2])]], columns=['Contact', 'Brodmann', 'MNI', 'X_mni', 'Y_mni', 'Z_mni'])
         atlas = pd.concat([atlas, df])
 
     # Save the files
-    with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
-        atlas.to_csv(path_or_buf=destinyDirectory+"/electrodes.csv", index=False, index_label=False)
-        print_atlas = atlas.to_string(index=False)
-        print(print_atlas)
+    if destinyDirectory != '.':
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None):  # more options can be specified also
+            atlas.to_csv(path_or_buf=destinyDirectory+"/location_electrodes.csv", index=False, index_label=False)
+    
+    print_atlas = atlas.to_string(index=False)
+    print("\nLocation of electrodes:")
+    print(print_atlas)
 
 def regionsMNInibabel(fixedVolumeNode):
     
@@ -963,8 +1169,10 @@ def importAndLoadDICOMFolder(dicom_folder):
     patients = db.patients()
     for patientUID in patients:
         studies = db.studiesForPatient(patientUID)
+        print('UID',patientUID)
         for studyUID in studies:
             series = db.seriesForStudy(studyUID)
+            print('study', studyUID)
             for seriesUID in series:
                 DICOMLib.loadSeriesByUID([seriesUID])
         
@@ -979,10 +1187,10 @@ class SEEGRecon(ScriptedLoadableModule):
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
-        self.parent.title = "SEEGRecon"  
-        self.parent.categories = ["Electrophysiology"]  
-        self.parent.dependencies = ["SlicerFreeSurfer", "SlicerElastix"]  
-        self.parent.contributors = ["Justo Montoya-Gálvez (Pompeu Fabra University; UPF); Alessandro Principe (Pompeu Fabra University & Hospital del Mar Research Institute; UPF-IMIM)"] 
+        self.parent.title = "SEEGRecon"  # TODO: make this more human readable by adding spaces
+        self.parent.categories = ["Electrophysiology"]  # TODO: set categories (folders where the module shows up in the module selector)
+        self.parent.dependencies = []  # TODO: add here list of module names that this module requires
+        self.parent.contributors = ["Justo Montoya-Gálvez (Pompeu Fabra University)","Alessandro Principe (Pompeu Fabra University, Hospital del Mar Research Institute)"]  # TODO: replace with "Firstname Lastname (Organization)"
         # TODO: update with short description of the module and a link to online module documentation
         self.parent.helpText = """
 This is an example of scripted loadable module bundled in an extension.
@@ -990,7 +1198,7 @@ See more information in <a href="https://github.com/justomont/SlicerSEEGRecon">m
 """
         # TODO: replace with organization, grant and thanks
         self.parent.acknowledgementText = """
-This file was originally developed by Justo Montoya-Gálvez & Alessandro Principe and was partially funded by Agència de Gestió d’Ajuts Universitaris i de Recerca (AGAUR) Generalitat de Catalunya grant number FI-SDUR 20203.
+This file was originally developed by Justo Montoya-Gálvez and Alessandro Principe and was partially funded by Agència de Gestió d’Ajuts Universitaris i de Recerca (AGAUR) Generalitat de Catalunya grant number FI-SDUR 20203.
 """
 
         # Additional initialization step after application startup is complete
@@ -1055,131 +1263,130 @@ class SEEGReconWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     """
 
     def __init__(self, parent=None):
+        super().__init__(parent)
         ScriptedLoadableModuleWidget.__init__(self, parent)
-        VTKObservationMixin.__init__(self)  # needed for parameter node observation
-        self.logic = None
+        VTKObservationMixin.__init__(self)
+        self.logic = SEEGReconLogic()
         self._parameterNode = None
         self._updatingGUIFromParameterNode = False
 
     def setup(self):
-        """
-        Called when the user opens the module the first time and the widget is initialized.
-        """
         ScriptedLoadableModuleWidget.setup(self)
 
-        # Load widget from .ui file (created by Qt Designer).
-        # Additional widgets can be instantiated manually and added to self.layout.
-        uiWidget = slicer.util.loadUI(self.resourcePath('UI/SEEGRecon.ui'))
-        self.layout.addWidget(uiWidget)
-        # self.ui = slicer.util.childWidgetVariables(uiWidget)
-        
+        # slicer.util.selectModule("Volumes")
 
-        def print_all_children(widget, level=0):
-            try:
-                name = widget.objectName
-            except:
-                name = 'NO NAME'
-            print("  " * level + f"{name} ({type(widget).__name__})")
-            for child in widget.children():
-                print_all_children(child, level + 1)
+        # Load UI
+        self.uiWidget = slicer.util.loadUI(self.resourcePath('UI/SEEGRecon.ui'))
+        self.uiWidget.setMRMLScene(slicer.mrmlScene)
 
-        # print("🔍 Full UI tree:")
-        # print_all_children(uiWidget)
+        # Always add to *this* module's layout
+        self.layout.addWidget(self.uiWidget)
 
-        print("🔍 UI children:")
-        # print(uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.inputsCollapsibleButton.applyButton) #.children()
-        
+        # Keep ui reference
+        self.ui = slicer.util.childWidgetVariables(self.uiWidget)
 
-        # # Verify widget loading
-        # if not hasattr(self.ui, 'DirectoryButton_saveBundle'):
-        #     logging.error("Failed to load DirectoryButton_saveBundle from UI file")
-        #     return
-
-        # Set scene in MRML widgets. Make sure that in Qt designer the top-level qMRMLWidget's
-        # "mrmlSceneChanged(vtkMRMLScene*)" signal in is connected to each MRML widget's.
-        # "setMRMLScene(vtkMRMLScene*)" slot.
-        uiWidget.setMRMLScene(slicer.mrmlScene)
-
-        # Create logic class. Logic implements all computations that should be possible to run
-        # in batch mode, without a graphical user interface.
         self.logic = SEEGReconLogic()
-
-        # Initialize parameter node first
         self.initializeParameterNode()
         
         # Add observers for scene events
-        self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
-        self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
-
+        # self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
+        # self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
 
         # These connections ensure that whenever user changes some settings on the GUI, that is saved in the MRML scene
         # (in the selected parameter node).
         # self.ui.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        self.inputSelector = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.inputsCollapsibleButton.inputSelector
-        self.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.inputSelector = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.inputsCollapsibleButton.inputSelector
+        self.ui.inputSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.labelmapSelector = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.inputsCollapsibleButton.labelmapSelector
+        self.ui.labelmapSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         # self.ui.electrodesSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        self.electrodesSelector = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton_2.electrodesSelector
-        self.electrodesSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.electrodesSelector = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton_2.electrodesSelector
+        self.ui.electrodesSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         # self.ui.fixedVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        self.fixedVolumeSelector = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton.fixedVolumeSelector
-        self.fixedVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.fixedVolumeSelector = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton.fixedVolumeSelector
+        self.ui.fixedVolumeSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.markupsToMapSelector = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton.markupsToMapSelector
+        self.ui.markupsToMapSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         # self.ui.inputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        self.inputListSelector = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.copytransferCollapsibleButton.inputListSelector
-        self.inputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.inputListSelector = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.copytransferCollapsibleButton.inputListSelector
+        self.ui.inputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         # self.ui.outputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
-        self.outputListSelector = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.copytransferCollapsibleButton.outputListSelector
-        self.outputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.outputListSelector = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.copytransferCollapsibleButton.outputListSelector
+        self.ui.outputListSelector.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
         # self.ui.checkBox_transfer.connect("toggled(bool)", self.updateParameterNodeFromGUI)
-        self.checkBox_transfer = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.copytransferCollapsibleButton.transferCollapsibleButton.checkBox_transfer
-        self.checkBox_transfer.connect("toggled(bool)", self.updateParameterNodeFromGUI)
+        self.ui.checkBox_transfer = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.copytransferCollapsibleButton.transferCollapsibleButton.checkBox_transfer
+        self.ui.checkBox_transfer.connect("toggled(bool)", self.updateParameterNodeFromGUI)
         # self.ui.DirectoryButton.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
-        self.DirectoryButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton.DirectoryButton
-        self.DirectoryButton.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
+        self.ui.DirectoryButton = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton.DirectoryButton
+        self.ui.DirectoryButton.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
         # self.ui.DirectoryButton_subject.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
-        self.DirectoryButton_subject = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton_2.DirectoryButton_subject
-        self.DirectoryButton_subject.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
+        self.ui.DirectoryButton_subject = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton_2.DirectoryButton_subject
+        self.ui.DirectoryButton_subject.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
         # self.ui.DirectoryButton_saveBundle.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
-        self.DirectoryButton_saveBundle = uiWidget.TabWidget.qt_tabwidget_stackedwidget.exportTab.exportGroupBox.DirectoryButton_saveBundle
-        self.DirectoryButton_saveBundle.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
+        self.ui.DirectoryButton_saveBundle = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.exportTab.exportGroupBox.DirectoryButton_saveBundle
+        self.ui.DirectoryButton_saveBundle.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
         # self.ui.DirectoryButton_rawFolder.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
-        self.DirectoryButton_rawFolder = uiWidget.TabWidget.qt_tabwidget_stackedwidget.importTab.ImportGroupBox.DirectoryButton_rawFolder
-        self.DirectoryButton_rawFolder.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
-        
+        self.ui.DirectoryButton_rawFolder = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.importTab.ImportGroupBox.DirectoryButton_rawFolder
+        self.ui.DirectoryButton_rawFolder.connect("directoryChanged(QString)", self.updateParameterNodeFromGUI)
+
+        self.ui.inputSelector_CT = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.registerTab.registerGroupBox.inputSelector_CT
+        self.ui.inputSelector_CT.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+        self.ui.inputSelector_MRI = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.registerTab.registerGroupBox.inputSelector_MRI
+        self.ui.inputSelector_MRI.connect("currentNodeChanged(vtkMRMLNode*)", self.updateParameterNodeFromGUI)
+
         # Other inputs
         # self.ui.saveFileName.editingFinished.connect(self.updateParameterNodeFromGUI)
-        self.saveFileName = uiWidget.TabWidget.qt_tabwidget_stackedwidget.exportTab.exportGroupBox.saveFileName
-        self.saveFileName.connect('editingFinished()', self.updateParameterNodeFromGUI)
+        self.ui.saveFileName = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.exportTab.exportGroupBox.saveFileName
+        self.ui.saveFileName.connect('editingFinished()', self.updateParameterNodeFromGUI)
 
         # Visualization advanced inputs
         # self.ui.templateName.activated.connect(self.updateParameterNodeFromGUI)
-        self.templateName = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.visualizationCollapsibleButton.templateName
-        self.templateName.connect('activated(QString)', self.updateParameterNodeFromGUI)    
+        self.ui.templateName = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.visualizationCollapsibleButton.templateName
+        self.ui.templateName.connect('activated(QString)', self.updateParameterNodeFromGUI)
         # self.ui.applySettingsButton.connect('clicked(bool)', self.onApplyTemplateSettingsButton)
-        self.applySettingsButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.visualizationCollapsibleButton.applySettingsButton
-        self.applySettingsButton.connect('clicked(bool)', self.onApplyTemplateSettingsButton)
-         
+        self.ui.applySettingsButton = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.visualizationCollapsibleButton.applySettingsButton
+        self.ui.applySettingsButton.connect('clicked(bool)', self.onApplyTemplateSettingsButton)
+
         # Buttons
-        self.applyButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.inputsCollapsibleButton.applyButton
-        self.applyButton.connect('clicked(bool)', self.onApplyButton)
+        self.ui.applyButton = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.inputsCollapsibleButton.applyButton
+        self.ui.applyButton.connect('clicked(bool)', self.onApplyButton)
 
         # self.ui.pushButton.connect('clicked(bool)', self.onPushButton)
-        self.pushButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton.pushButton
-        self.pushButton.connect('clicked(bool)', self.onPushButton)
+        self.ui.pushButton = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton.pushButton
+        self.ui.pushButton.connect('clicked(bool)', self.onPushButton)
         # self.ui.copyButton.connect('clicked(bool)', self.onCopyButton)
-        self.copyButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.copytransferCollapsibleButton.copyButton
-        self.copyButton.connect('clicked(bool)', self.onCopyButton)
+        self.ui.copyButton = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.copytransferCollapsibleButton.copyButton
+        self.ui.copyButton.connect('clicked(bool)', self.onCopyButton)
         # self.ui.pushButton_mapping.connect('clicked(bool)', self.onPushButton_mapping)
-        self.pushButton_mapping = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton.pushButton_mapping
-        self.pushButton_mapping.connect('clicked(bool)', self.onPushButton_mapping) 
+        self.ui.pushButton_mapping = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton.pushButton_mapping
+        self.ui.pushButton_mapping.connect('clicked(bool)', self.onPushButton_mapping)
         # self.ui.saveTableButton.connect('clicked(bool)', self.onSaveTableButton)
-        self.saveTableButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton_2.saveTableButton
-        self.saveTableButton.connect('clicked(bool)', self.onSaveTableButton)
+        self.ui.saveTableButton = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.mainTab.outputsCollapsibleButton_2.saveTableButton
+        self.ui.saveTableButton.connect('clicked(bool)', self.onSaveTableButton)
         # self.ui.saveBundleButton.connect('clicked(bool)', self.onSaveBundleButton)
-        self.saveBundleButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.exportTab.exportGroupBox.saveBundleButton
-        self.saveBundleButton.connect('clicked(bool)', self.onSaveBundleButton)
-        # self.ui.ImportPatientButton.connect('clicked(bool)', self.onImportPatientButton)
-        self.ImportPatientButton = uiWidget.TabWidget.qt_tabwidget_stackedwidget.importTab.ImportGroupBox.ImportPatientButton
-        self.ImportPatientButton.connect('clicked(bool)', self.onImportPatientButton)   
+        self.ui.saveBundleButton = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.exportTab.exportGroupBox.saveBundleButton
+        self.ui.saveBundleButton.connect('clicked(bool)', self.onSaveBundleButton)
+
+        self.ui.comboBoxSaveBundle = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.exportTab.exportGroupBox.comboBoxSaveBundle
+        self.ui.comboBoxSaveBundle.connect('activated(QString)', self.updateParameterNodeFromGUI)
+
+        self.ui.ImportPatientButton = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.importTab.ImportGroupBox.ImportPatientButton
+        self.ui.ImportPatientButton.connect('clicked(bool)', self.onImportPatientButton)
+
+        self.ui.ImportEpiDBButton = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.importTab.ImportEpiDBGroupBox.ImportEpiDBButton
+        self.ui.ImportEpiDBButton.connect('clicked(bool)', self.onImportEpiDBButton)
+
+        self.ui.registerButton = self.uiWidget.TabWidget.qt_tabwidget_stackedwidget.registerTab.registerGroupBox.registerButton
+        self.ui.registerButton.connect('clicked(bool)', self.onRegisterButton)
+
+        # Add the option to create a custom labelmap
+        combo = self.ui.templateName
+        CREATE_ITEM_TEXT = "+ Create new template..."
+        # Add only once
+        if combo.findText(CREATE_ITEM_TEXT) == -1:
+            combo.addItem(CREATE_ITEM_TEXT)
+        # Connect handler
+        combo.connect('activated(QString)', self.onTemplateNameActivated)
 
     def cleanup(self):
         """
@@ -1267,47 +1474,73 @@ class SEEGReconWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self._updatingGUIFromParameterNode = True
 
         # Update node selectors and sliders
-        self.inputSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
-        self.electrodesSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputElectrodes"))
-        self.fixedVolumeSelector.setCurrentNode(self._parameterNode.GetNodeReference("fixedVolume"))
-        self.checkBox_transfer.checked = (self._parameterNode.GetParameter("Transfer") == "false")
-        self.inputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputListVolume"))
-        self.outputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputListVolume"))
-        self.DirectoryButton.directory = str(self._parameterNode.GetParameter("Directory"))
-        self.DirectoryButton_subject.directory = str(self._parameterNode.GetParameter("Directory_Subject"))
-        self.DirectoryButton_saveBundle.directory = str(self._parameterNode.GetParameter("saveDirectory"))
-        self.DirectoryButton_rawFolder.directory = str(self._parameterNode.GetParameter("rawDirectory"))
-        self.saveFileName.text = str(self._parameterNode.GetParameter("saveFileName"))
+        self.ui.inputSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume"))
+        self.ui.labelmapSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputLabelMap"))
+        self.ui.electrodesSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputElectrodes"))
+        self.ui.fixedVolumeSelector.setCurrentNode(self._parameterNode.GetNodeReference("fixedVolume"))
+        self.ui.markupsToMapSelector.setCurrentNode(self._parameterNode.GetNodeReference("markupsToMap"))
+        self.ui.checkBox_transfer.checked = (self._parameterNode.GetParameter("Transfer") == "false")
+        self.ui.inputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("InputListVolume"))
+        self.ui.outputListSelector.setCurrentNode(self._parameterNode.GetNodeReference("OutputListVolume"))
+        self.ui.DirectoryButton.directory = str(self._parameterNode.GetParameter("Directory"))
+        self.ui.DirectoryButton_subject.directory = str(self._parameterNode.GetParameter("Directory_Subject"))
+        self.ui.DirectoryButton_saveBundle.directory = str(self._parameterNode.GetParameter("saveDirectory"))
+        self.ui.DirectoryButton_rawFolder.directory = str(self._parameterNode.GetParameter("rawDirectory"))
+        self.ui.EpiDB_filePath.currentPath = str(self._parameterNode.GetParameter("EpiDB_filePath"))
+        self.ui.saveFileName.text = str(self._parameterNode.GetParameter("saveFileName"))
                 
-        self.visulizeMarkupsWidget.setCurrentNode(self._parameterNode.GetNodeReference("visualizationInputVolume"))
-        self.templateName.setCurrentText(str(self._parameterNode.GetParameter("templateName")))
+        # self.ui.visulizeMarkupsWidget.setCurrentNode(self._parameterNode.GetNodeReference("visualizationInputVolume"))
+        self.ui.templateName.setCurrentText(str(self._parameterNode.GetParameter("templateName")))
+        self.ui.comboBoxSaveBundle.setCurrentText(str(self._parameterNode.GetParameter("comboBoxSaveBundle")))
+
+        self.ui.inputSelector_CT.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume_CT"))
+        self.ui.inputSelector_MRI.setCurrentNode(self._parameterNode.GetNodeReference("InputVolume_MRI"))
 
         # Update buttons states and tooltips (Enable)
         if self._parameterNode.GetNodeReference("InputVolume"):
-            self.applyButton.toolTip = "Generate electrodes"
-            self.applyButton.enabled = True
+            self.ui.applyButton.toolTip = "Generate electrodes"
+            self.ui.applyButton.enabled = True
         else:
-            self.applyButton.toolTip = "Select input volume node"
-            self.applyButton.enabled = False
-            
+            self.ui.applyButton.toolTip = "Select input volume node"
+            self.ui.applyButton.enabled = False
+
+        if self._parameterNode.GetNodeReference("templateName"):
+            self.ui.templateName.toolTip = "Apply template"
+            self.ui.applySettingsButton.enabled = True
+        else:
+            self.ui.templateName.toolTip = "Select template"
+            self.ui.applySettingsButton.enabled = False
+
         # Update buttons states and tooltips
         if self._parameterNode.GetNodeReference("InputElectrodes"):
-            self.saveTableButton.toolTip = "Generate table"
-            self.saveTableButton.enabled = True
+            self.ui.saveTableButton.toolTip = "Generate table"
+            self.ui.saveTableButton.enabled = True
         else:
-            self.saveTableButton.toolTip = "Select input"
-            self.saveTableButton.enabled = False
-        
+            self.ui.saveTableButton.toolTip = "Select input"
+            self.ui.saveTableButton.enabled = False
+
         if self._parameterNode.GetParameter("saveDirectory"):
-            self.saveBundleButton.enabled = True
+            self.ui.saveBundleButton.enabled = True
         else:
-            self.saveBundleButton.enabled = False
+            self.ui.saveBundleButton.enabled = False
 
         if self._parameterNode.GetParameter("rawDirectory"):
-            self.ImportPatientButton.enabled = True
+            self.ui.ImportPatientButton.enabled = True
         else:
-            self.ImportPatientButton.enabled = False
-        
+            self.ui.ImportPatientButton.enabled = False
+
+        if self._parameterNode.GetParameter("EpiDB_filePath"):
+            self.ui.ImportEpiDBButton.enabled = True
+        else:
+            self.ui.ImportEpiDBButton.enabled = False
+
+        if self._parameterNode.GetNodeReference("InputVolume_CT") and self._parameterNode.GetNodeReference("InputVolume_MRI"):
+            self.ui.registerButton.toolTip = "Register CT Image to MR Image"
+            self.ui.registerButton.enabled = True
+        else:
+            self.ui.registerButton.toolTip = "Select input volumes (CT and MRI)"
+            self.ui.registerButton.enabled = False
+
         
         # All the GUI updates are done
         self._updatingGUIFromParameterNode = False
@@ -1323,22 +1556,65 @@ class SEEGReconWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         wasModified = self._parameterNode.StartModify()  # Modify all properties in a single batch
 
-        self._parameterNode.SetNodeReferenceID("InputVolume", self.inputSelector.currentNodeID)
-        self._parameterNode.SetNodeReferenceID("InputElectrodes", self.electrodesSelector.currentNodeID)
-        self._parameterNode.SetNodeReferenceID("fixedVolume", self.fixedVolumeSelector.currentNodeID)
-        self._parameterNode.SetNodeReferenceID("InputListVolume", self.inputListSelector.currentNodeID)
-        self._parameterNode.SetNodeReferenceID("OutputListVolume", self.outputListSelector.currentNodeID)
-        self._parameterNode.SetParameter("Directory", str(self.DirectoryButton.directory))
-        self._parameterNode.SetParameter("Directory_Subject", str(self.DirectoryButton_subject.directory))
-        self._parameterNode.SetParameter("saveDirectory", str(self.DirectoryButton_saveBundle.directory))
-        self._parameterNode.SetParameter("rawDirectory", str(self.DirectoryButton_rawFolder.directory))
-        self._parameterNode.SetParameter("Transfer", "true" if self.checkBox_transfer.checked else "false")
-        self._parameterNode.SetParameter("saveFileName", str(self.saveFileName.text))
-                
+        self._parameterNode.SetNodeReferenceID("InputVolume", self.ui.inputSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("InputLabelMap", self.ui.labelmapSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("InputElectrodes", self.ui.electrodesSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("fixedVolume", self.ui.fixedVolumeSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("markupsToMap", self.ui.markupsToMapSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("InputListVolume", self.ui.inputListSelector.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("OutputListVolume", self.ui.outputListSelector.currentNodeID)
+        self._parameterNode.SetParameter("Directory", str(self.ui.DirectoryButton.directory))
+        self._parameterNode.SetParameter("Directory_Subject", str(self.ui.DirectoryButton_subject.directory))
+        self._parameterNode.SetParameter("saveDirectory", str(self.ui.DirectoryButton_saveBundle.directory))
+        self._parameterNode.SetParameter("rawDirectory", str(self.ui.DirectoryButton_rawFolder.directory))
+        self._parameterNode.SetParameter("EpiDB_filePath", str(self.ui.EpiDB_filePath.currentPath))
+        self._parameterNode.SetParameter("Transfer", "true" if self.ui.checkBox_transfer.checked else "false")
+        self._parameterNode.SetParameter("saveFileName", str(self.ui.saveFileName.text))
+
+        self._parameterNode.SetNodeReferenceID("InputVolume_CT", self.ui.inputSelector_CT.currentNodeID)
+        self._parameterNode.SetNodeReferenceID("InputVolume_MRI", self.ui.inputSelector_MRI.currentNodeID)
+
         # self._parameterNode.SetNodeReferenceID("visualizationInputVolume", self.ui.visulizeMarkupsWidget.currentNode().currentNodeID)
-        self._parameterNode.SetParameter("templateName", str(self.templateName.currentText))
+        self._parameterNode.SetParameter("templateName", str(self.ui.templateName.currentText))
+        self._parameterNode.SetParameter("comboBoxSaveBundle", str(self.ui.comboBoxSaveBundle.currentText))
+        
 
         self._parameterNode.EndModify(wasModified)
+
+    def captureTemplateFromFirstVisible(self):
+        markups = slicer.util.getNodesByClass("vtkMRMLMarkupsFiducialNode")
+        for markup in markups:
+            displayNode = markup.GetDisplayNode()
+            if displayNode and displayNode.GetVisibility() == 1:
+                return {
+                    "glyphSize": displayNode.GetGlyphScale(),
+                    "textSize": displayNode.GetTextScale(),
+                    "selectedColor": displayNode.GetSelectedColor(),
+                    "unselectedColor": displayNode.GetColor(),
+                    "activeColor": displayNode.GetActiveColor(),
+                    "glyphType": displayNode.GetGlyphType(),
+                }
+        return None
+
+    def onTemplateNameActivated(self, text):
+        CREATE_ITEM_TEXT = "+ Create new template..."
+        if text == CREATE_ITEM_TEXT:
+            newLabel = qt.QInputDialog.getText(
+                slicer.util.mainWindow(),
+                "Create new label",
+                "Enter template name:"
+            )
+            if newLabel:  # empty string if cancelled
+                insertIndex = self.ui.templateName.findText(CREATE_ITEM_TEXT)
+                self.ui.templateName.insertItem(insertIndex, newLabel)
+                self.ui.templateName.setCurrentText(newLabel)
+                settings = self.captureTemplateFromFirstVisible()
+                if settings:
+                    self.logic.userTemplates[newLabel] = settings
+            else:
+                # revert selection if cancelled
+                self.ui.templateName.setCurrentIndex(0)
+        self.updateParameterNodeFromGUI()
 
     def onApplyButton(self):
         """
@@ -1347,67 +1623,86 @@ class SEEGReconWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         with slicer.util.tryWithErrorDisplay("Failed to compute results.", waitCursor=True):
 
             # Compute output
-            fidNode = self.inputSelector.currentNode()
+            fidNode = self.ui.inputSelector.currentNode()
+            labelmapNode = self.ui.labelmapSelector.currentNode()
+
+            print(labelmapNode)
             
-            # checked_mapping = self.ui.checkBox_mapping.checked
-            # fixedVolumeNode = self.ui.fixedVolumeSelector.currentNode()
-            
-            self.logic.process(fidNode)
+            self.logic.process(fidNode, labelmapNode)
+
+    def onRegisterButton(self):
+        """
+        Run processing when user clicks "Register" button.
+        """
+        with slicer.util.tryWithErrorDisplay("Failed to compute results.", waitCursor=True):
+
+            # Compute output
+            ctVolumeNode = self.ui.inputSelector_CT.currentNode()
+            t1VolumeNode = self.ui.inputSelector_MRI.currentNode()
+
+            self.logic.registerCTtoT1MRI(t1VolumeNode, ctVolumeNode)
     
     def onPushButton(self):
         with slicer.util.tryWithErrorDisplay("Failed to compute results.", waitCursor=True):
 
             # Compute output
-            fixedVolumeNode = self.fixedVolumeSelector.currentNode()
+            fixedVolumeNode = self.ui.fixedVolumeSelector.currentNode()
             self.logic.regions(fixedVolumeNode)
             
-            destinyDirectory = self.DirectoryButton.directory
+            destinyDirectory = self.ui.DirectoryButton.directory
             self.logic.regions_parttwo(destinyDirectory)
     
     def onApplyTemplateSettingsButton(self):
         
-        electrodeList = self.visulizeMarkupsWidget.currentNode()
-        
-        templateName = self.templateName.currentText
-        
+        # electrodeList = self.ui.visulizeMarkupsWidget.currentNode()
+
+        templateName = self.ui.templateName.currentText
+
         self.logic.applyTemplate(templateName)
     
     def onPushButton_mapping(self):
-        
-        destinyDirectory = self.DirectoryButton.directory
-        self.logic.regions_partthree(destinyDirectory)
+
+        destinyDirectory = self.ui.DirectoryButton.directory
+        markups_to_map = self.ui.markupsToMapSelector.currentNode()
+        templateVolumeNode = self.ui.customTemplateSelector.currentNode()
+        self.logic.regions_partthree(destinyDirectory, markups_to_map, templateVolumeNode)
         
             
     def onSaveTableButton(self):
-        
-        destinyDirectory = self.DirectoryButton_subject.directory
-        electrodesNode = self.electrodesSelector.currentNode()        
-        
+
+        destinyDirectory = self.ui.DirectoryButton_subject.directory
+        electrodesNode = self.ui.electrodesSelector.currentNode()
+
         self.logic.save_info(destinyDirectory, electrodesNode)
         
     def onSaveBundleButton(self):
-        
-        destinyDirectory = self.DirectoryButton_saveBundle.directory
-        name_of_file = self.saveFileName.text
-                
-        self.logic.save_Bundle(destinyDirectory, name_of_file)
+
+        destinyDirectory = self.ui.DirectoryButton_saveBundle.directory
+        name_of_file = self.ui.saveFileName.text
+        format_Option = self.ui.comboBoxSaveBundle.currentText
+
+        self.logic.save_Bundle(destinyDirectory, name_of_file, format_Option)
     
     def onImportPatientButton(self):
 
-        rawDirectory = self.DirectoryButton_rawFolder.directory
+        rawDirectory = self.ui.DirectoryButton_rawFolder.directory
         print(f"Importing patient data from: {rawDirectory}")
 
         self.logic.import_patient(rawDirectory)
 
+    def onImportEpiDBButton(self):
+
+        EpiDB_filePath = self.ui.EpiDB_filePath.currentPath
+        self.logic.import_EpiDB(EpiDB_filePath)
+
     def onCopyButton(self):
-        
-        inputList = self.inputListSelector.currentNode()
-        outputList = self.outputListSelector.currentNode()
-        checked_transfer = self.checkBox_transfer.checked
-        
+
+        inputList = self.ui.inputListSelector.currentNode()
+        outputList = self.ui.outputListSelector.currentNode()
+        checked_transfer = self.ui.checkBox_transfer.checked
+
         self.logic.copy_transfer(inputList, outputList, checked_transfer)
         
-
 #
 # SEEGReconLogic
 #
@@ -1427,6 +1722,7 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
         Called when the logic class is instantiated. Can be used for initializing member variables.
         """
         ScriptedLoadableModuleLogic.__init__(self)
+        self.userTemplates = {}
 
     def setDefaultParameters(self, parameterNode):
         """
@@ -1435,7 +1731,7 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
         if not parameterNode.GetParameter("Bipolar"):
             parameterNode.SetParameter("Bipolar", "false")
 
-    def process(self, fidNode):
+    def process(self, fidNode, labelmapNode):
         """
         Run the processing algorithm.
         Can be used without GUI widget.
@@ -1449,9 +1745,9 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
 
         startTime = time.time()
         logging.info("Processing electrodes...")
-        
-        findContacts(fidNode)
-        
+
+        findContacts(fidNode, labelmapNode)
+
         stopTime = time.time()
         logging.info(f'Processing completed in {stopTime-startTime:.2f} seconds')
     
@@ -1475,12 +1771,16 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
             mean_x = sum(x_coords) / len(x_coords)
             color = (1.0, 0.0, 0.0) if mean_x < 0 else (0.0, 0.0, 1.0)  # Red or Blue
 
-            # Set display properties
-            displayNode = markupNode.GetDisplayNode()
-            if displayNode:
-                displayNode.SetGlyphTypeFromString("Circle2D")
-                displayNode.SetSelectedColor(color)
-                displayNode.SetColor(color)
+            displayNode = markupNode.GetMarkupsDisplayNode()
+            if not displayNode:
+                markupNode.CreateDefaultDisplayNodes()
+                displayNode = markupNode.GetMarkupsDisplayNode()
+
+            displayNode.SetGlyphTypeFromString("Sphere3D")
+            displayNode.SetSelectedColor(color)
+            displayNode.SetColor(color)
+            displayNode.SetUseGlyphScale(False) # disable screen-relative scaling
+            displayNode.SetGlyphSize(5.0) # This sets the markups to 5 mm
 
             # Lock the markup node
             markupNode.SetLocked(True)
@@ -1492,6 +1792,7 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
                 markupNode.GetNthControlPointPositionWorld(i, pos)
                 label = markupNode.GetNthControlPointLabel(i)
                 controlPoints.append((label, pos))
+                markupNode.SetNthControlPointLocked(i, True)
 
             # Sort using natural order
             controlPoints.sort(key=lambda x: natural_keys(x[0]))
@@ -1551,11 +1852,27 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
             self.update_all_markups()
             self.update_all_models()
 
-        elif templateName == "Template2":
-            # Apply Template2 settings
-            pass
-        else:
-            logging.error(f"Unknown template: {templateName}")
+        if templateName in self.userTemplates:
+            self.applyUserTemplate(templateName)
+
+    def applyUserTemplate(self, templateName):
+        s = self.userTemplates.get(templateName)
+        if not s:
+            return
+        markups = slicer.util.getNodesByClass("vtkMRMLMarkupsFiducialNode")
+        for markup in markups:
+            displayNode = markup.GetDisplayNode()
+            # Apply only to visible fiducials
+            if displayNode.GetVisibility() != 1:
+                continue
+            if displayNode and displayNode.GetVisibility() == 1:
+                displayNode.SetGlyphScale(s["glyphSize"])
+                displayNode.SetTextScale(s["textSize"])
+                displayNode.SetSelectedColor(s["selectedColor"])
+                displayNode.SetColor(s["unselectedColor"])
+                displayNode.SetActiveColor(s["activeColor"])
+                displayNode.SetGlyphType(s["glyphType"])
+
     
     def regions(self,fixedVolumeNode):
         
@@ -1567,8 +1884,8 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
         # time.sleep(15)
         regionsMNI(destinyDirectory)
         
-    def regions_partthree(self,destinyDirectory):
-        regionsMNI_2(destinyDirectory)
+    def regions_partthree(self,destinyDirectory, markups_to_map, templateVolumeNode):
+        regionsMNI_2(destinyDirectory, markups_to_map, templateVolumeNode)
         
     def copy_transfer(self,inputList,outputList,transfer):
                 
@@ -1601,8 +1918,9 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
         
         global asegVolumeNode, asegVoxelArray
         asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('brain_segmentation')
-        if not asegVolumeNode: 
-            asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
+        print(asegVolumeNode.GetName())
+        # if not asegVolumeNode: 
+        #     asegVolumeNode = slicer.mrmlScene.GetFirstNodeByName('aseg')
         asegVoxelArray = slicer.util.arrayFromVolume(asegVolumeNode)
         
         # All markup's names and positions in RAS coordinates
@@ -1704,7 +2022,7 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
         except:
             logging.error("Saving failed")
 
-    def registerCTtoT1MRI(self, t1VolumeNode, ctVolumeNode):
+    def registerCTtoT1MRI(self, t1VolumeNode, ctVolumeNode, progress=None, progress_lenght=None):
 
         """        Register CT volume to T1 MRI volume.
         :param t1VolumeNode: T1 MRI volume node
@@ -1718,16 +2036,24 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
         transformLogic = slicer.modules.transforms.logic()
 
         print("     Extracting bone from CT volume...")
+        if progress:
+            progress.setValue(progress_lenght+1)
+            progress.setLabelText(f"This process could take up to 5 minutes. \nExtracting bone from CT volume...")
+            slicer.app.processEvents()
 
         # Extract the bone from the CT volume
         ctVolume = volumesLogic.CloneVolume(slicer.mrmlScene,ctVolumeNode, 'CT_Bones')
         volumesLogic.CenterVolume(ctVolume)
-        boneThreshold = 500 
+        boneThreshold = 500
         ctArray = slicer.util.arrayFromVolume(ctVolume)
         ctArray[ctArray <= boneThreshold] = 0  # Set values below threshold to 0
         slicer.util.arrayFromVolumeModified(ctVolume)
 
         print("     Loading template...")
+        if progress:
+            progress.setValue(progress_lenght+2)
+            progress.setLabelText(f"This process could take up to 5 minutes. \nLoading template...")
+            slicer.app.processEvents()
         # Extract bone from the MNI152 template
         resPath = os.path.join(os.path.dirname(__file__), 'Resources/MNI')
         mniPath = os.path.join(resPath, 'icbm_avg_152_t1_tal_lin.nii')
@@ -1758,6 +2084,10 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
         slicer.util.updateVolumeFromArray(mniBonesVolume, mniBonesArray)
 
         print("     Registering Template to CT... WAIT ...")
+        if progress:
+            progress.setValue(progress_lenght+3)
+            progress.setLabelText(f"This process could take up to 5 minutes. \nRegistering template to CT... This may take a while.")
+            slicer.app.processEvents()
         outputVolume = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLScalarVolumeNode', 'ICBM_CTregistered')
         ICBMtoCT_Transform = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLTransformNode', 'ICBMtoCT')
 
@@ -1779,6 +2109,11 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
         CTtoICBM_Transform.Inverse()
 
         print("     Registering Template to T1 MRI... WAIT ...")
+        if progress:
+            progress.setValue(progress_lenght+4)
+            progress.setLabelText(f"This process could take up to 5 minutes. \nRegistering Template to T1 MRI... This may take a while.")
+            slicer.app.processEvents()
+
         mniVolume = slicer.util.getNode("ICBM152")
         outputVolume = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLScalarVolumeNode', 'ICBM_MRIregistered')
         ICBMtoMRI_Transform = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLTransformNode', 'ICBMtoMRI')
@@ -1794,6 +2129,10 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
         elastix_widget.onApplyButton()
 
         print("     Applying non-linear transforms to CT volume...")
+        if progress:
+            progress.setValue(progress_lenght+5)
+            progress.setLabelText(f"This process could take up to 5 minutes. \nApplying non-linear transforms to CT volume...")
+            slicer.app.processEvents()
         # Apply the transforms to the CT volume
         ctVolumeNode = slicer.util.getFirstNodeByName("CT_postElectrodes_RAW")
         ctRegisteredVolumeNode = slicer.mrmlScene.CopyNode(ctVolumeNode)
@@ -1808,6 +2147,10 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
         slicer.vtkSlicerTransformLogic().hardenTransform(ctRegisteredVolumeNode)
 
         print("     Registering Goal to CT... WAIT ...")
+        if progress:
+            progress.setValue(progress_lenght+6)
+            progress.setLabelText(f"This process could take up to 5 minutes. \nRegistering Goal to CT... Almost finished!")
+            slicer.app.processEvents()
         # Register the goal to the CT volume
         ctGoalVolumeNode = slicer.util.getFirstNodeByName("CT_Registered_ICBM_GOAL")
         ctRawVolumeNode = slicer.util.getFirstNodeByName("CT_postElectrodes_RAW")
@@ -1836,18 +2179,83 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
         ctFinalVolumeNode.SetAndObserveTransformNodeID(CTtoGoal_Transform.GetID())
         slicer.vtkSlicerTransformLogic().hardenTransform(ctFinalVolumeNode)
 
-        slicer.util.selectModule("SEEGRecon")
+        slicer.util.selectModule("AutoSEEG")
+
+        # Delete all nodes that are not needed aymore
+        slicer.mrmlScene.RemoveNode(ctVolume)
+        slicer.mrmlScene.RemoveNode(mniVolume)
+        slicer.mrmlScene.RemoveNode(mniBrainMaskVolume)
+        slicer.mrmlScene.RemoveNode(mniHeadMaskVolume)
+        slicer.mrmlScene.RemoveNode(mniBonesVolume)
+        outputVolume = slicer.util.getNode("CT_postElectrodes")
+        slicer.mrmlScene.RemoveNode(outputVolume)
+        outputVolume = slicer.util.getNode("CTGoaltoCT")
+        slicer.mrmlScene.RemoveNode(outputVolume)
+        outputVolume = slicer.util.getNode("ICBM_CTregistered")
+        slicer.mrmlScene.RemoveNode(outputVolume)
+        outputVolume = slicer.util.getNode("ICBM_MRIregistered")
+        slicer.mrmlScene.RemoveNode(outputVolume)
+        slicer.mrmlScene.RemoveNode(ICBMtoCT_Transform)
+        slicer.mrmlScene.RemoveNode(ICBMtoMRI_Transform)
+        slicer.mrmlScene.RemoveNode(CTtoICBM_Transform)
+        slicer.mrmlScene.RemoveNode(ctVolumeNode)
+        ctRegisteredVolumeNode = slicer.util.getNode("CT_Registered_ICBM")
+        slicer.mrmlScene.RemoveNode(ctRegisteredVolumeNode)
+        slicer.mrmlScene.RemoveNode(ctGoalVolumeNode)
+        slicer.mrmlScene.RemoveNode(ctRawVolumeNode)
+        slicer.mrmlScene.RemoveNode(CTGoaltoCT_Transform)
+
+        # Remove the patient that was loaded when loading the DICOM
+        shNode = slicer.vtkMRMLSubjectHierarchyNode.GetSubjectHierarchyNode(slicer.mrmlScene)
+        sceneItemID = shNode.GetSceneItemID()
+        childIDs = vtk.vtkIdList()
+        shNode.GetItemChildren(sceneItemID, childIDs, True)
+        for i in range(childIDs.GetNumberOfIds()):
+            itemID = childIDs.GetId(i)
+            if shNode.GetItemLevel(itemID) == "Patient":
+                shNode.RemoveItem(itemID)
 
         print("     Done!")
 
+    def import_EpiDB(self, filePath):
+
+        print(filePath)
+        # create temp dir
+        tempDir = tempfile.mkdtemp()
+
+        # Unzip bundle
+        with zipfile.ZipFile(filePath, 'r') as z:
+            z.extractall(tempDir)
+
+        for root, _, files in os.walk(tempDir):
+            for file in files:
+                print(root, file)
+
+                if file.endswith('.nrrd'):
+                    if file.startswith('brain_segmentation'):
+                        success, labelNode = slicer.util.loadVolume(os.path.join(root, file), {'labelmap': True,'center':True}, returnNode=True)
+                        colorNode = slicer.util.getNode("FreeSurferLabels")
+                        if not colorNode:
+                            colorNode = slicer.util.getNode("GenericColors")
+                        labelNode.GetDisplayNode().SetAndObserveColorNodeID(colorNode.GetID())
+                    else:
+                        slicer.util.loadVolume(os.path.join(root, file), {'center':True})
+                elif file.endswith('.vtk'):
+                    slicer.util.loadModel(os.path.join(root, file))
+                elif file.endswith(".mrk.json"):
+                    slicer.util.loadMarkups(os.path.join(root, file))
+
+
 
     def import_patient(self, rawDirectory):
+        
+
+        print(rawDirectory)
 
         """
         Import patient data from a raw folder.
         :param rawDirectory: Directory containing the raw patient data
         """
-
         # Count time it takes to import the patient data
         startTime = time.time()
 
@@ -1867,10 +2275,23 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
                 if file_name in files and file_name not in found_files:
                     found_files[file_name] = os.path.join(root, file_name)# Search for aseg.mgz in all subfolders of rawDirectory
         
+        progress = qt.QProgressDialog(
+            "This process could take up to 5 minutes.",
+            "OK",
+            0,
+            len(found_files)+3+7,
+            slicer.util.mainWindow()
+        )
+        progress.setWindowTitle("Please wait")
+        progress.setWindowModality(qt.Qt.ApplicationModal)
+        progress.show()
+
         print('Loading DICOM data... \n')
         
         # Load DICOM data
         importAndLoadDICOMFolder(dicom_folder)
+        progress.setValue(0)
+        slicer.app.processEvents()
 
         # IMPORTANT: Since the DICOM is the only vtkMRMLScalarVolumeNode we look for it and change the name (it cannot be changed in the importAndLoadDICOMFolder function)
         # This should be always the first volume loaded, so it is safe to do this
@@ -1881,9 +2302,12 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
             volumesLogic = slicer.modules.volumes.logic()
             volumesLogic.CenterVolume(dicomVolumeNode)
 
-        for filename in found_files:
+        for fileIndex, filename in enumerate(found_files):
 
             print(f"Processing file: {filename}")
+            progress.setValue(fileIndex+1)
+            progress.setLabelText(f"This process could take up to 5 minutes. \nProcessing file: {filename}...")
+            slicer.app.processEvents()
 
             file_path = found_files[filename]
 
@@ -1892,7 +2316,7 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
                 print(f"Loading segmentation: {filename} ...\n")
                 
                 # Load aseg as labelmap volume
-                labelmapNode = slicer.util.loadVolume(file_path, {'labelmap': True})
+                labelmapNode = slicer.util.loadVolume(file_path, {'labelmap': True, 'center':True})
                 labelmapNode.SetName("aseg")
 
                 # Set color table to FreeSurfer labels
@@ -1905,7 +2329,7 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
 
             if filename.endswith('.mgz') and ('norm' in filename.lower() or 'T1' in filename):
                 print(f"Loading volume: {filename} ...\n")
-                volumeNode = slicer.util.loadVolume(file_path)
+                volumeNode = slicer.util.loadVolume(file_path, {'center':True})
                 if 'norm' in filename.lower():
                     volumeNode.SetName("brain")
                 elif 'T1' in filename:
@@ -1931,9 +2355,14 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
         t1VolumeNode = slicer.util.getNode("MRI_T1")
         ctVolumeNode = slicer.util.getNode("CT_postElectrodes_RAW")
 
-        self.registerCTtoT1MRI(t1VolumeNode, ctVolumeNode)
+        self.registerCTtoT1MRI(t1VolumeNode, ctVolumeNode, progress, progress_lenght=len(found_files)+2)
+        
+        progress.setValue(len(found_files)+3+7)
+        slicer.app.processEvents()
+        
 
         print("Files imported successfully!\n")
+
 
         # Count time it took to import the patient data
         stopTime = time.time()
@@ -1941,34 +2370,20 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
         elapsed_seconds = int((stopTime - startTime) % 60)
         print(f'Importing patient data completed in {elapsed_minutes} min {elapsed_seconds} sec')
 
-
-        # if t1VolumeNode and ctVolumeNode:
-        #     linearTransformNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLLinearTransformNode")
-        #     linearTransformNode.SetName("TransformCTtoT1")
-        #     outputVolumeNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
-        #     outputVolumeNode.SetName("CT_postElectrodes") 
-
-        #     parameters = {"fixedVolume": t1VolumeNode,
-        #                   "movingVolume": ctVolumeNode,
-        #                   "samplingPercentage": 0.02,
-        #                   "linearTransform": linearTransformNode,
-        #                   "outputVolume": outputVolumeNode,
-        #                   "initializeTransformMode": "useCenterOfHeadAlign",
-        #                   "useRigid": True}
-            
-        #     # Execution
-        #     generalRegistration = slicer.modules.brainsfit
-        #     cliNode = slicer.cli.run(generalRegistration, None, parameters)
+        progress.close()
 
 
 
-    def save_Bundle(self, destinationDirectory, name_of_file):
+
+    def save_Bundle(self, destinationDirectory, name_of_file, format_Option):
         
         # Create folder of the patient
         destinationDirectory = os.path.join(destinationDirectory, name_of_file)
 
         namesOfFilesToSearch = ['aseg',
+                                'brain_segmentation',
                                 '3D',
+                                'MRI_T1',
                                 'brain',
                                 'norm',
                                 'lhp',
@@ -1985,6 +2400,7 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
                                 'pet.3D',
                                 'PET.3D',
                                 'PET.3d',
+                                'PET',
                                 'ct.3d',
                                 'CT.3d',
                                 'ct.3D',
@@ -1993,22 +2409,36 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
                                 'CTp.3d',
                                 'ctp.3D',
                                 'CTp.3D',
+                                'CT_postElectrodes',
                                 'res',
                                 'resection',
                                 'real-L','real-R',
                                 'real-L-P','real-R-P',
+                                'real-L_Grey_Matter', 'real-R_Grey_Matter',
+                                # 'real-L-W','real-R-W',
+                                # 'real-L_White_Matter', 'real-R_White_Matter',
                                 'electrodes_L','electrodes_R',
                                 'electrodes_L_Grey_Matter','electrodes_R_Grey_Matter',
+                                'electrodes_L_grey','electrodes_R_grey',
+                                # 'electrodes_L_White_Matter','electrodes_R_White_Matter',
+                                # 'real-R_outside_brain', 'real-L_outside_brain',
+                                'electrodes_bipolar_L', 'electrodes_bipolar_R',
+                                'electrodes_bipolar_L_grey','electrodes_bipolar_R_grey',
                                 'Bipolar-real-L','Bipolar-real-R',
+                                'Bipolar_real-L', 'Bipolar_real-R',
                                 'Bipolar-real-L-P','Bipolar-real-R-P',
+                                'Bipolar_real-L_Grey_Matter','Bipolar_real-R_Grey_Matter',
+                                # 'Bipolar_real-L_White_Matter','Bipolar_real-R_White_Matter',
                                 'Bipolar_electrodes_L','Bipolar_electrodes_R',
                                 'Bipolar_electrodes_L_Grey_Matter','Bipolar_electrodes_R_Grey_Matter',
+                                # 'Bipolar_electrodes_L_White_Matter','Bipolar_electrodes_R_White_Matter',
+                                # 'Bipolar_real-L_Outside','Bipolar_real-R_Outside',
                                 'etc','ETC']
         
-        nrrdFiles = ['aseg','3D', 'brain', 'norm',
-                     'pet.3d','pet.3D','PET.3D','PET.3d',
+        nrrdFiles = ['aseg', 'brain_segmentation','3D','MRI_T1', 'brain', 'norm',
+                     'pet.3d','pet.3D','PET.3D','PET.3d','PET',
                      'ct.3d','CT.3d','ct.3D','CT.3D',
-                     'ctp.3d','CTp.3d','ctp.3D','CTp.3D',]
+                     'ctp.3d','CTp.3d','ctp.3D','CTp.3D','CT_postElectrodes']
         
         vtkFiles = ['lhp','lh_pial', 'lh_grey',
                     'rhp','rh_pial', 'rh_grey',
@@ -2027,7 +2457,9 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
                         'etc','ETC']
         
         renamingDict = {'aseg':'brain_segmentation',
+                        'brain_segmentation':'brain_segmentation',
                         '3D': 'MRI_T1',
+                        'MRI_T1':'MRI_T1',
                         'brain':'brain',
                         'norm':'brain',
                         'lhp':'lh_grey',
@@ -2044,6 +2476,7 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
                         'pet.3D':'PET',
                         'PET.3D':'PET',
                         'PET.3d':'PET',
+                        'PET':'PET',
                         'ct.3d':'CT',
                         'CT.3d':'CT',
                         'ct.3D':'CT',
@@ -2056,24 +2489,51 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
                         'CTps.3d':'CT_postElectrodes',
                         'ctps.3D':'CT_postElectrodes',
                         'CTps.3D':'CT_postElectrodes',
+                        'CT_postElectrodes':'CT_postElectrodes',
                         'res':'resection',
                         'resection':'resection',
                         'real-L':'electrodes_L',
                         'real-R':'electrodes_R',
                         'real-L-P':'electrodes_L_grey',
-                        'real-R-P':'electrodes_L_grey',
+                        'real-R-P':'electrodes_R_grey',
+                        'real-L_Grey_Matter':'electrodes_L_grey',
+                        'real-R_Grey_Matter':'electrodes_R_grey',
+                        'real-L-W': 'electrodes_L_white',
+                        'real-R-W': 'electrodes_R_white',
+                        'real-L_White_Matter': 'electrodes_L_white', 
+                        'real-R_White_Matter': 'electrodes_R_white',
                         'electrodes_L':'electrodes_L',
                         'electrodes_R':'electrodes_R',
+                        'electrodes_L_grey':'electrodes_L_grey',
+                        'electrodes_R_grey':'electrodes_R_grey',
                         'electrodes_L_Grey_Matter':'electrodes_L_grey',
                         'electrodes_R_Grey_Matter':'electrodes_R_grey',
+                        'electrodes_L_White_Matter': 'electrodes_L_white',
+                        'electrodes_R_White_Matter': 'electrodes_R_white',
+                        'real-R_outside_brain': 'electrodes_R_outside', 
+                        'real-L_outside_brain': 'electrodes_L_outside',
+                        'electrodes_bipolar_L':'electrodes_bipolar_L',
+                        'electrodes_bipolar_R':'electrodes_bipolar_R',
                         'Bipolar-real-L':'electrodes_bipolar_L',
                         'Bipolar-real-R':'electrodes_bipolar_R',
+                        'Bipolar_real-L':'electrodes_bipolar_L',
+                        'Bipolar_real-R':'electrodes_bipolar_R',
+                        'electrodes_bipolar_L_grey':'electrodes_bipolar_L_grey',
+                        'electrodes_bipolar_R_grey':'electrodes_bipolar_R_grey',
                         'Bipolar-real-L-P':'electrodes_bipolar_L_grey',
                         'Bipolar-real-R-P':'electrodes_bipolar_R_grey',
                         'Bipolar_electrodes_L':'electrodes_bipolar_L',
                         'Bipolar_electrodes_R':'electrodes_bipolar_R',
                         'Bipolar_electrodes_L_Grey_Matter':'electrodes_bipolar_L_grey',
                         'Bipolar_electrodes_R_Grey_Matter':'electrodes_bipolar_R_grey',
+                        'Bipolar_electrodes_L_White_Matter': 'electrodes_bipolar_L_white',
+                        'Bipolar_electrodes_R_White_Matter': 'electrodes_bipolar_R_white',
+                        'Bipolar_real-L_Grey_Matter':'electrodes_bipolar_L_grey',
+                        'Bipolar_real-R_Grey_Matter':'electrodes_bipolar_R_grey',
+                        'Bipolar_real-L_White_Matter': 'electrodes_bipolar_L_white',
+                        'Bipolar_real-R_White_Matter': 'electrodes_bipolar_R_white',
+                        'Bipolar_real-L_Outside': 'electrodes_bipolar_L_outside',
+                        'Bipolar_real-R_Outside': 'electrodes_bipolar_R_outside',
                         'etc':'ETC',
                         'ETC':'ETC'}
 
@@ -2122,6 +2582,23 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
 
             else:
                 pass
+
+        if format_Option in ('Compressed', 'Both'):
+            print(format_Option)
+            # Path of the resulting ZIP file (same parent directory)
+            zip_path = destinationDirectory + ".epiDB"
+            with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
+                for root, dirs, files in os.walk(destinationDirectory):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        # Preserve relative folder structure inside ZIP
+                        arcname = os.path.relpath(file_path, destinationDirectory)
+                        zipf.write(file_path, arcname)
+            if format_Option == 'Compressed':
+                # Delete folders
+                shutil.rmtree(destinationDirectory)
+
+
             
 
 #
