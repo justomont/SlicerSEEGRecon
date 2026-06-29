@@ -82,7 +82,7 @@
           </size>
          </property>
          <property name="text">
-          <string>Autoelectrodes</string>
+          <string>SEEGRecon</string>
          </property>
          <property name="collapsed">
           <bool>false</bool>

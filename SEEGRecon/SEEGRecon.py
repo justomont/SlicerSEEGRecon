@@ -969,19 +969,19 @@ def importAndLoadDICOMFolder(dicom_folder):
                 DICOMLib.loadSeriesByUID([seriesUID])
         
 #
-# SlicerSEEGRecon
+# SEEGRecon
 #
 
-class SlicerSEEGRecon(ScriptedLoadableModule):
+class SEEGRecon(ScriptedLoadableModule):
     """Uses ScriptedLoadableModule base class, available at:
     https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
     """
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
-        self.parent.title = "SlicerSEEGRecon"  
+        self.parent.title = "SEEGRecon"  
         self.parent.categories = ["Electrophysiology"]  
-        self.parent.dependencies = ["SlicerFreeSurfer;SlicerElastix"]  
+        self.parent.dependencies = ["SlicerFreeSurfer", "SlicerElastix"]  
         self.parent.contributors = ["Justo Montoya-Gálvez (Pompeu Fabra University; UPF); Alessandro Principe (Pompeu Fabra University & Hospital del Mar Research Institute; UPF-IMIM)"] 
         # TODO: update with short description of the module and a link to online module documentation
         self.parent.helpText = """
@@ -1013,54 +1013,48 @@ def registerSampleData():
     # To ensure that the source code repository remains small (can be downloaded and installed quickly)
     # it is recommended to store data sets that are larger than a few MB in a Github release.
 
-    # SlicerSEEGRecon1
+    # SEEGRecon1
     SampleData.SampleDataLogic.registerCustomSampleDataSource(
         # Category and sample name displayed in Sample Data module
-        category='SlicerSEEGRecon',
-        sampleName='SlicerSEEGRecon1',
+        category='SEEGRecon',
+        sampleName='SEEGRecon1',
         # Thumbnail should have size of approximately 260x280 pixels and stored in Resources/Icons folder.
         # It can be created by Screen Capture module, "Capture all views" option enabled, "Number of images" set to "Single".
-        thumbnailFileName=os.path.join(iconsPath, 'SlicerSEEGRecon1.png'),
+        thumbnailFileName=os.path.join(iconsPath, 'SEEGRecon1.png'),
         # Download URL and target file name
         uris="https://github.com/Slicer/SlicerTestingData/releases/download/SHA256/998cb522173839c78657f4bc0ea907cea09fd04e44601f17c82ea27927937b95",
-        fileNames='SlicerSEEGRecon1.nrrd',
+        fileNames='SEEGRecon1.nrrd',
         # Checksum to ensure file integrity. Can be computed by this command:
         #  import hashlib; print(hashlib.sha256(open(filename, "rb").read()).hexdigest())
         checksums='SHA256:998cb522173839c78657f4bc0ea907cea09fd04e44601f17c82ea27927937b95',
         # This node name will be used when the data set is loaded
-        nodeNames='SlicerSEEGRecon1'
+        nodeNames='SEEGRecon1'
     )
 
-    # SlicerSEEGRecon2
+    # SEEGRecon2
     SampleData.SampleDataLogic.registerCustomSampleDataSource(
         # Category and sample name displayed in Sample Data module
-        category='SlicerSEEGRecon',
-        sampleName='SlicerSEEGRecon2',
-        thumbnailFileName=os.path.join(iconsPath, 'SlicerSEEGRecon2.png'),
+        category='SEEGRecon',
+        sampleName='SEEGRecon2',
+        thumbnailFileName=os.path.join(iconsPath, 'SEEGRecon2.png'),
         # Download URL and target file name
         uris="https://github.com/Slicer/SlicerTestingData/releases/download/SHA256/1a64f3f422eb3d1c9b093d1a18da354b13bcf307907c66317e2463ee530b7a97",
-        fileNames='SlicerSEEGRecon2.nrrd',
+        fileNames='SEEGRecon2.nrrd',
         checksums='SHA256:1a64f3f422eb3d1c9b093d1a18da354b13bcf307907c66317e2463ee530b7a97',
         # This node name will be used when the data set is loaded
-        nodeNames='SlicerSEEGRecon2'
+        nodeNames='SEEGRecon2'
     )
 
 #
-# SlicerSEEGReconWidget
+# SEEGReconWidget
 #
 
-class SlicerSEEGReconWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
+class SEEGReconWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     """Uses ScriptedLoadableModuleWidget base class, available at:
     https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
     """
 
     def __init__(self, parent=None):
-        """Traceback (most recent call last):
-  File "/home/marzieh/Dropbox/M/my-plotly/SlicerSlicerSEEGRecon-main/SlicerSlicerSEEGRecon/SlicerSEEGRecon/SlicerSEEGRecon.py", line 1636, in openEDFviewer
-    popup = PlotWindow()
-NameError: name 'PlotWindow' is not defined
-        Called when the user opens the module the first time and the widget is initialized.
-        """
         ScriptedLoadableModuleWidget.__init__(self, parent)
         VTKObservationMixin.__init__(self)  # needed for parameter node observation
         self.logic = None
@@ -1075,7 +1069,7 @@ NameError: name 'PlotWindow' is not defined
 
         # Load widget from .ui file (created by Qt Designer).
         # Additional widgets can be instantiated manually and added to self.layout.
-        uiWidget = slicer.util.loadUI(self.resourcePath('UI/SlicerSEEGRecon.ui'))
+        uiWidget = slicer.util.loadUI(self.resourcePath('UI/SEEGRecon.ui'))
         self.layout.addWidget(uiWidget)
         # self.ui = slicer.util.childWidgetVariables(uiWidget)
         
@@ -1108,7 +1102,7 @@ NameError: name 'PlotWindow' is not defined
 
         # Create logic class. Logic implements all computations that should be possible to run
         # in batch mode, without a graphical user interface.
-        self.logic = SlicerSEEGReconLogic()
+        self.logic = SEEGReconLogic()
 
         # Initialize parameter node first
         self.initializeParameterNode()
@@ -1415,10 +1409,10 @@ NameError: name 'PlotWindow' is not defined
         
 
 #
-# SlicerSEEGReconLogic
+# SEEGReconLogic
 #
 
-class SlicerSEEGReconLogic(ScriptedLoadableModuleLogic):
+class SEEGReconLogic(ScriptedLoadableModuleLogic):
     """This class should implement all the actual
     computation done by your module.  The interface
     should be such that other python code can import
@@ -1842,7 +1836,7 @@ class SlicerSEEGReconLogic(ScriptedLoadableModuleLogic):
         ctFinalVolumeNode.SetAndObserveTransformNodeID(CTtoGoal_Transform.GetID())
         slicer.vtkSlicerTransformLogic().hardenTransform(ctFinalVolumeNode)
 
-        slicer.util.selectModule("SlicerSEEGRecon")
+        slicer.util.selectModule("SEEGRecon")
 
         print("     Done!")
 
@@ -2131,10 +2125,10 @@ class SlicerSEEGReconLogic(ScriptedLoadableModuleLogic):
             
 
 #
-# SlicerSEEGReconTest
+# SEEGReconTest
 #
 
-class SlicerSEEGReconTest(ScriptedLoadableModuleTest):
+class SEEGReconTest(ScriptedLoadableModuleTest):
     """
     This is the test case for your scripted module.
     Uses ScriptedLoadableModuleTest base class, available at:
@@ -2150,9 +2144,9 @@ class SlicerSEEGReconTest(ScriptedLoadableModuleTest):
         """Run as few or as many tests as needed here.
         """
         self.setUp()
-        self.test_SlicerSEEGRecon1()
+        self.test_SEEGRecon1()
 
-    def test_SlicerSEEGRecon1(self):
+    def test_SEEGRecon1(self):
         """ Ideally you should have several levels of tests.  At the lowest level
         tests should exercise the functionality of the logic with different inputs
         (both valid and invalid).  At higher levels your tests should emulate the
@@ -2170,7 +2164,7 @@ class SlicerSEEGReconTest(ScriptedLoadableModuleTest):
 
         # import SampleData
         # registerSampleData()
-        # inputVolume = SampleData.downloadSample('SlicerSEEGRecon1')
+        # inputVolume = SampleData.downloadSample('SEEGRecon1')
         
         testPath = '/Volumes/GoogleDrive/Mi unidad/_PhD/SLICER/test_subject_1/real.mrml'
         slicer.util.loadScene(testPath)
@@ -2186,7 +2180,7 @@ class SlicerSEEGReconTest(ScriptedLoadableModuleTest):
 
         # Test the module logic
 
-        logic = SlicerSEEGReconLogic()
+        logic = SEEGReconLogic()
 
         # Test algorithm with non-inverted threshold
         logic.process()
