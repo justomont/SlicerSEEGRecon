@@ -33,6 +33,7 @@ This module is designed for clinicians and researchers working with intracranial
 - [Installation](#installation)
 - [Open Source](#-open-source)
 - [Authors](#authors)
+- [Clinical Use Disclaimer](#clinical-use-disclaimer)
 
 ## 🚀 What this tool helps you do
 
