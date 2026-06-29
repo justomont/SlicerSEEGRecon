@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>484</width>
-    <height>893</height>
+    <height>901</height>
    </rect>
   </property>
   <layout class="QHBoxLayout" name="horizontalLayout">
@@ -730,6 +730,13 @@
             </property>
             <property name="text">
              <string>Apply settings</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="deleteTemplateButton">
+            <property name="text">
+             <string>Delete template</string>
             </property>
            </widget>
           </item>

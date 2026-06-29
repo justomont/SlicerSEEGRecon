@@ -1388,6 +1388,15 @@ class SEEGReconWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         # Connect handler
         combo.connect('activated(QString)', self.onTemplateNameActivated)
 
+        # Restore saved user templates into the combo box
+        for templateName in self.logic.userTemplates:
+            if combo.findText(templateName) == -1:
+                insertIndex = combo.findText(CREATE_ITEM_TEXT)
+                combo.insertItem(insertIndex, templateName)
+
+        self.ui.deleteTemplateButton.connect('clicked(bool)', self.onDeleteTemplateButton)
+
+
     def cleanup(self):
         """
         Called when the application closes and the module widget is destroyed.
@@ -1587,12 +1596,12 @@ class SEEGReconWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             displayNode = markup.GetDisplayNode()
             if displayNode and displayNode.GetVisibility() == 1:
                 return {
-                    "glyphSize": displayNode.GetGlyphScale(),
-                    "textSize": displayNode.GetTextScale(),
-                    "selectedColor": displayNode.GetSelectedColor(),
-                    "unselectedColor": displayNode.GetColor(),
-                    "activeColor": displayNode.GetActiveColor(),
-                    "glyphType": displayNode.GetGlyphType(),
+                    "glyphSize":       float(displayNode.GetGlyphScale()),
+                    "textSize":        float(displayNode.GetTextScale()),
+                    "selectedColor":   list(displayNode.GetSelectedColor()),
+                    "unselectedColor": list(displayNode.GetColor()),
+                    "activeColor":     list(displayNode.GetActiveColor()),
+                    "glyphType":       int(displayNode.GetGlyphType()),
                 }
         return None
 
@@ -1611,6 +1620,7 @@ class SEEGReconWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 settings = self.captureTemplateFromFirstVisible()
                 if settings:
                     self.logic.userTemplates[newLabel] = settings
+                    self.logic.saveTemplatesToSettings()
             else:
                 # revert selection if cancelled
                 self.ui.templateName.setCurrentIndex(0)
@@ -1660,6 +1670,29 @@ class SEEGReconWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         self.logic.applyTemplate(templateName)
     
+    def onDeleteTemplateButton(self):
+        templateName = self.ui.templateName.currentText
+        # Guard against deleting built-in templates
+        PROTECTED = {"EpiDB", "+ Create new template..."}
+        if templateName in PROTECTED:
+            slicer.util.warningDisplay(f'"{templateName}" is a built-in template and cannot be deleted.')
+            return
+        # Confirm with user
+        confirmed = qt.QMessageBox.question(
+            slicer.util.mainWindow(),
+            "Delete template",
+            f'Are you sure you want to delete "{templateName}"?',
+            qt.QMessageBox.Yes | qt.QMessageBox.No
+        ) == qt.QMessageBox.Yes
+        if not confirmed:
+            return
+        # Remove from dict, settings, and combo box
+        self.logic.userTemplates.pop(templateName, None)
+        self.logic.saveTemplatesToSettings()
+        index = self.ui.templateName.findText(templateName)
+        if index != -1:
+            self.ui.templateName.removeItem(index)
+
     def onPushButton_mapping(self):
 
         destinyDirectory = self.ui.DirectoryButton.directory
@@ -1723,6 +1756,7 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
         """
         ScriptedLoadableModuleLogic.__init__(self)
         self.userTemplates = {}
+        self.loadTemplatesFromSettings()
 
     def setDefaultParameters(self, parameterNode):
         """
@@ -1839,6 +1873,19 @@ class SEEGReconLogic(ScriptedLoadableModuleLogic):
             else:
                 displayNode.SetVisibility(False)
 
+    # SETTINGS_KEY = "SEEGRecon/userTemplates"
+    TEMPLATES_FILE = os.path.join(os.path.dirname(__file__), 'Resources', 'userTemplates','userTemplates.json')
+
+    def saveTemplatesToSettings(self):
+        with open(self.TEMPLATES_FILE, 'w') as f:
+            json.dump(self.userTemplates, f, indent=2)
+
+    def loadTemplatesFromSettings(self):
+        if os.path.exists(self.TEMPLATES_FILE):
+            with open(self.TEMPLATES_FILE, 'r') as f:
+                self.userTemplates = json.load(f)
+        else:
+            self.userTemplates = {}
 
     def applyTemplate(self, templateName):
         
