@@ -178,6 +178,8 @@ This software is intended to support research and clinical workflows involving s
 
 Users are responsible for verifying all outputs before using them for clinical decision-making. The authors and contributors assume no responsibility for clinical decisions or patient outcomes resulting from the use of this software.
 
+Read the full Medical and Clinical Use Disclaimer [here](https://github.com/justomont/SlicerSEEGRecon/blob/main/DISCLAIMER.md). 
+
 ----
 
 [Back to top](#top)
