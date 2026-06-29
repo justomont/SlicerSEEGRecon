@@ -148,6 +148,7 @@ Think of it as a cleaner, more practical alternative to .mrb-style scenes.
 
 * Operating System: Windows 11, MacOS BigSur v11.6 to Tahoe v26.5.1 (Linux is untested but expected to work)
 * [3D Slicer](https://www.slicer.org/) (recommended v5.8.1)
+* Dependencies: [SlicerFreeSurfer](https://github.com/PerkLab/SlicerFreeSurfer) & [SlicerElastix](https://github.com/lassoan/SlicerElastix) (can be downloaded through the Extension Manager)
 
 ## Installation
 
