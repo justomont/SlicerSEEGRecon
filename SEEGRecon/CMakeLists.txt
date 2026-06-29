@@ -13,11 +13,10 @@ set(MODULE_PYTHON_RESOURCES
 
 #-----------------------------------------------------------------------------
 slicerMacroBuildScriptedModule(
-  NAME ${MODULE_NAME}
-  SCRIPTS ${MODULE_PYTHON_SCRIPTS}
-  RESOURCES ${MODULE_PYTHON_RESOURCES}
-  WITH_GENERIC_TESTS
-  )
+  NAME SEEGRecon
+  SCRIPTS SEEGRecon.py
+  RESOURCES Resources
+)
 
 #-----------------------------------------------------------------------------
 if(BUILD_TESTING)
