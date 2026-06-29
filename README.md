@@ -159,7 +159,7 @@ Think of it as a cleaner, more practical alternative to .mrb-style scenes.
 7. Select and open the unzipped folder **SlicerSEEGRecon**.
 8. A window will appear, ensure that both boxes are selected, then click on **Yes**.
 9. Installation complete!
-10. To open the extension, go to the Modules Menu > SEEG > Autoelectrodes.
+10. To open the extension, go to the Modules Menu > Electrophysiology > SlicerSEEGRecon.
 11. Have fun! 
 
 ## 🤝 Open Source
