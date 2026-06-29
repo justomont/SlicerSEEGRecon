@@ -156,10 +156,10 @@ Think of it as a cleaner, more practical alternative to .mrb-style scenes.
 4. Start 3D Slicer.
 5. Go to Modules (upper bar) and click on the magnifier icon.
 6. Select Extension Wizard > Extension Tools > Select Extension.
-7. Select and open the unzipped folder **SlicerAutoelectrodes**.
+7. Select and open the unzipped folder **SlicerSEEGRecon**.
 8. A window will appear, ensure that both boxes are selected, then click on **Yes**.
 9. Installation complete!
-10. To open the extension, go to the Modules Menu > SEEG > Autoelectrodes.
+10. To open the extension, go to the Modules Menu > Electrophysiology > SlicerSEEGRecon.
 11. Have fun! 
 
 ## 🤝 Open Source
