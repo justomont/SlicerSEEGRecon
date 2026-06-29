@@ -1,26 +1,23 @@
-cmake_minimum_required(VERSION 3.16.3...3.19.7 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.16.3)
 
-project(Autoelectrodes)
+project(SlicerSEEGRecon)
 
 #-----------------------------------------------------------------------------
 # Extension meta-information
-set(EXTENSION_HOMEPAGE "https://www.slicer.org/wiki/Documentation/Nightly/Extensions/Autoelectrodes")
-set(EXTENSION_CATEGORY "SEEG")
-set(EXTENSION_CONTRIBUTORS "Justo Montoya (Universitat Pompeu Fabra)")
-set(EXTENSION_DESCRIPTION "This is an example of a simple extension")
-set(EXTENSION_ICONURL "https://www.example.com/Slicer/Extensions/Autoelectrodes.png")
-set(EXTENSION_SCREENSHOTURLS "https://www.example.com/Slicer/Extensions/Autoelectrodes/Screenshots/1.png")
-set(EXTENSION_DEPENDS "NA") # Specified as a list or "NA" if no dependencies
+set(EXTENSION_HOMEPAGE "https://github.com/justomont/SlicerSEEGRecon")
+set(EXTENSION_CATEGORY "Electrophysiology")
+set(EXTENSION_CONTRIBUTORS "Justo Montoya-Gálvez (Universitat Pompeu Fabra; UPF), Alessandro Principe (UPF)")
+set(EXTENSION_DESCRIPTION "SEEG Reconstruction & Analysis Toolkit")
+set(EXTENSION_ICONURL "")
+set(EXTENSION_SCREENSHOTURLS "")
+set(EXTENSION_DEPENDS "SlicerFreeSurfer;SlicerElastix")
 
 #-----------------------------------------------------------------------------
-# Extension dependencies
 find_package(Slicer REQUIRED)
 include(${Slicer_USE_FILE})
 
 #-----------------------------------------------------------------------------
-# Extension modules
-add_subdirectory(Autoelectrodes)
-## NEXT_MODULE
+add_subdirectory(SlicerSEEGRecon)
 
 #-----------------------------------------------------------------------------
 include(${Slicer_EXTENSION_GENERATE_CONFIG})
