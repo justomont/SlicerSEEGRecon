@@ -173,7 +173,9 @@ This project is fully open source and built to grow. Contributions are more than
 ----
 ### Clinical Use Disclaimer
 
-This software is intended for research and educational purposes. Although the algorithms have been validated on an internal dataset, users are responsible for verifying all results before clinical use. The authors assume no responsibility for clinical decisions based on the output of this software.
+This software is intended to support research and clinical workflows involving stereoelectroencephalography (SEEG). Although some components have been validated on an internal dataset, the software is **not** a certified medical device.
+
+Users are responsible for verifying all outputs before using them for clinical decision-making. The authors and contributors assume no responsibility for clinical decisions or patient outcomes resulting from the use of this software.
 
 ----
 
