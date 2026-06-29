@@ -1,4 +1,5 @@
 # SlicerSEEGRecon
+[![BSD-3-Clause License](https://img.shields.io/github/license/justomont/SlicerSEEGRecon)](https://opensource.org/license/bsd-3-clause)
 <img src="https://github.com/justomont/SlicerAutoelectrodes/blob/main/Autoelectrodes/Resources/Icons/Autoelectrodes.png" align="right"
      alt="SlicerSEEGRecon Logo" width="160" height="178">
      
