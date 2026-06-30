@@ -33,6 +33,7 @@ This module is designed for clinicians and researchers working with intracranial
 - [Installation](#installation)
 - [Open Source](#-open-source)
 - [Authors](#authors)
+- [Clinical Use Disclaimer](#clinical-use-disclaimer)
 
 ## 🚀 What this tool helps you do
 
@@ -147,6 +148,7 @@ Think of it as a cleaner, more practical alternative to .mrb-style scenes.
 
 * Operating System: Windows 11, MacOS BigSur v11.6 to Tahoe v26.5.1 (Linux is untested but expected to work)
 * [3D Slicer](https://www.slicer.org/) (recommended v5.8.1)
+* Dependencies: [SlicerFreeSurfer](https://github.com/PerkLab/SlicerFreeSurfer) & [SlicerElastix](https://github.com/lassoan/SlicerElastix) (can be downloaded through the Extension Manager)
 
 ## Installation
 
@@ -177,6 +179,8 @@ This project is fully open source and built to grow. Contributions are more than
 This software is intended to support research and clinical workflows involving stereoelectroencephalography (SEEG). Although some components have been validated on an internal dataset, the software is **not** a certified medical device.
 
 Users are responsible for verifying all outputs before using them for clinical decision-making. The authors and contributors assume no responsibility for clinical decisions or patient outcomes resulting from the use of this software.
+
+Read the full Medical and Clinical Use Disclaimer [here](https://github.com/justomont/SlicerSEEGRecon/blob/main/DISCLAIMER.md). 
 
 ----
 
