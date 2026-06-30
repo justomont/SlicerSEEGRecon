@@ -176,8 +176,8 @@ This project is fully open source and built to grow. Contributions are more than
 
 ## Authors
 
-- [@justomont](https://www.github.com/justomont): Justo Montoya-Gálvez (Department of Engineering, Universitat Pompeu Fabra (UPF), 08003 Barcelona, Spain)
-- [@joricomico](https://www.github.com/joricomico): Alessandro Principe (Epilepsy Group, Hospital del Mar Research Institute (IMIM), 08003 Barcelona, Spain)
+- [@justomont](https://www.github.com/justomont): Justo Montoya-Gálvez, MSc (Department of Engineering, Universitat Pompeu Fabra (UPF), 08003 Barcelona, Spain)
+- [@joricomico](https://www.github.com/joricomico): Alessandro Principe, MD, PhD (Epilepsy Group, Hospital del Mar Research Institute (IMIM), 08003 Barcelona, Spain)
 
 ----
 ### Clinical Use Disclaimer
