@@ -4,6 +4,7 @@
 ![GitHub issues](https://img.shields.io/github/issues/justomont/SlicerSEEGRecon)
 ![3D Slicer](https://img.shields.io/badge/3D%20Slicer-5.8.1-blue)
 [![Wiki](https://img.shields.io/badge/docs-wiki-blue)](https://github.com/justomont/SlicerSEEGRecon/wiki)
+![GitHub Repo stars](https://img.shields.io/github/stars/justomont/SlicerSEEGRecon)
 
 <img src="https://github.com/justomont/SlicerSEEGRecon/blob/main/SEEGRecon/Resources/Icons/SEEGRecon.png" align="right"
      alt="SlicerSEEGRecon Logo" width="160" height="178">
