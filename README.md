@@ -1,5 +1,10 @@
 # SlicerSEEGRecon
 [![BSD-3-Clause License](https://img.shields.io/github/license/justomont/SlicerSEEGRecon)](https://opensource.org/license/bsd-3-clause)
+![GitHub last commit](https://img.shields.io/github/last-commit/justomont/SlicerSEEGRecon)
+![GitHub issues](https://img.shields.io/github/issues/justomont/SlicerSEEGRecon)
+![3D Slicer](https://img.shields.io/badge/3D%20Slicer-5.8.1-blue)
+[![Wiki](https://img.shields.io/badge/docs-wiki-blue)](https://github.com/justomont/SlicerSEEGRecon/wiki)
+
 <img src="https://github.com/justomont/SlicerSEEGRecon/blob/main/SEEGRecon/Resources/Icons/SEEGRecon.png" align="right"
      alt="SlicerSEEGRecon Logo" width="160" height="178">
      
