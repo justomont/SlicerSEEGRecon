@@ -12,11 +12,11 @@ This module is designed for clinicians and researchers working with intracranial
 <p align="center">
   <img src="https://github.com/justomont/SlicerSEEGRecon/blob/main/SEEGRecon/Resources/Icons/marca_vermella.png"
        alt="UPF logo"
-       width="180">
+       height=60>
   &nbsp;&nbsp;&nbsp;
   <img src="https://github.com/justomont/SlicerSEEGRecon/blob/main/SEEGRecon/Resources/Icons/IMIM-logo.png"
        alt="IMIM logo"
-       width="210">
+       height=60>
 </p>
 
 ## Table of Contents
